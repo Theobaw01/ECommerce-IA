@@ -1,0 +1,7 @@
+Moyens de paiement acceptés
+
+Carte bancaire : Visa, Mastercard, American Express.
+PayPal et Apple Pay.
+Paiement en 3x ou 4x sans frais dès 100€ (via Alma).
+Virement bancaire pour les commandes professionnelles.
+Transactions sécurisées par chiffrement SSL 256 bits.

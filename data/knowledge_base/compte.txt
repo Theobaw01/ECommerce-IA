@@ -1,0 +1,6 @@
+Gestion de compte
+
+Inscription gratuite avec email ou OAuth Google/GitHub.
+Historique de commandes complet.
+Liste de souhaits et alertes de prix.
+Suppression du compte sur simple demande (RGPD).

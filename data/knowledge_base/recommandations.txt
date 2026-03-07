@@ -1,0 +1,8 @@
+Système de recommandation
+
+Algorithme hybride à 4 facteurs :
+- Historique d'achats (40%) : collaborative filtering SVD
+- Similarité produits (30%) : content-based filtering
+- Proximité géographique (15%) : distance Haversine
+- Budget utilisateur (15%) : filtrage par gamme de prix
+Les recommandations sont recalculées en temps réel.

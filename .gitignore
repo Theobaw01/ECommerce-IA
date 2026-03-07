@@ -15,9 +15,19 @@ env/
 # Données volumineuses
 data/raw/
 data/processed/
+data/kaggle_download/
+data/splits/
 models/*.pth
 models/*.pt
+models/**/*.pkl
+models/chatbot/chroma_db/
 *.h5
+
+# Garder les fichiers de métadonnées
+!data/*.json
+!data/*.csv
+!data/knowledge_base/
+!data/download_dataset.py
 
 # IDE
 .vscode/
@@ -44,3 +54,4 @@ logs/
 
 # Résultats (optionnel — peut être commité)
 # results/
+kaggle.json
