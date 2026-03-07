@@ -54,7 +54,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Variables d'environnement
-JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "***REMOVED***")
+# ⚠️ JWT_SECRET DOIT être défini via la variable d'environnement JWT_SECRET_KEY
+#    Ne JAMAIS hardcoder de secret dans le code source.
+#    Exemple : export JWT_SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))")
+JWT_SECRET = os.environ.get("JWT_SECRET_KEY")
+if not JWT_SECRET:
+    import secrets
+    JWT_SECRET = secrets.token_urlsafe(64)
+    logger.warning("⚠️  JWT_SECRET_KEY non défini — clé aléatoire générée (non persistante)")
 JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_EXPIRATION = int(os.environ.get("JWT_EXPIRATION_MINUTES", "60"))
 
