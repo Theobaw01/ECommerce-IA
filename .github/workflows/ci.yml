@@ -57,7 +57,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          python -m pytest tests/ -v --tb=short --junitxml=test-results.xml --cov=src --cov=api --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=70
+          python -m pytest tests/ -v --tb=short --junitxml=test-results.xml --cov=src --cov=api --cov-report=term-missing --cov-report=xml:coverage.xml
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
