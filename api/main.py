@@ -197,6 +197,20 @@ class ChatResponse(BaseModel):
     confiance: float
     sources: List[str]
     escalade_humain: bool
+    nlp: Optional[Dict[str, Any]] = None
+
+
+# NLP
+class NLPAnalysisRequest(BaseModel):
+    texte: str = Field(..., min_length=1, max_length=5000)
+
+
+class NLPAnalysisResponse(BaseModel):
+    texte: str
+    intent: Dict[str, Any]
+    entities: List[Dict[str, Any]]
+    sentiment: Dict[str, Any]
+    keywords: List[Dict[str, Any]]
 
 
 # Produits
@@ -671,8 +685,15 @@ async def chat(message: ChatMessage):
     """
     Envoie un message au chatbot IA.
     
-    Architecture RAG : recherche dans la base de connaissances
-    + génération de réponse contextuelle.
+    Pipeline NLP + RAG :
+    1. Analyse NLP (intent, NER, sentiment)
+    2. Routing intelligent vers le module adapté
+    3. Recherche RAG dans ChromaDB (top-3 documents)
+    4. Génération de réponse contextuelle
+    5. Escalade humain si confiance < 0.6 ou sentiment négatif
+    
+    La réponse inclut les données NLP (intent, entités, sentiment)
+    pour enrichir l'interface utilisateur.
     """
     pipeline = get_pipeline()
     
@@ -689,7 +710,8 @@ async def chat(message: ChatMessage):
         reponse=response.get("reponse", ""),
         confiance=response.get("confiance", 0.0),
         sources=response.get("sources", []),
-        escalade_humain=response.get("escalade_humain", False)
+        escalade_humain=response.get("escalade_humain", False),
+        nlp=response.get("nlp", None)
     )
 
 
@@ -710,6 +732,134 @@ async def get_chat_history(session_id: str):
         "messages": history,
         "count": len(history)
     }
+
+
+# ============================================
+# ENDPOINTS — NLP (Natural Language Processing)
+# ============================================
+@app.post("/nlp/analyze", response_model=NLPAnalysisResponse, tags=["NLP"])
+async def analyze_text(request: NLPAnalysisRequest):
+    """
+    Analyse NLP complète d'un texte.
+    
+    Pipeline :
+    1. Prétraitement (tokenisation, lemmatisation, stopwords)
+    2. Détection d'intent (classification d'intention)
+    3. NER (Named Entity Recognition)
+    4. Analyse de sentiment (lexique pondéré + négations)
+    5. Extraction de mots-clés (TF-IDF simplifié)
+    
+    Intents : recherche_produit, suivi_commande, retour_remboursement,
+    livraison, paiement, recommandation, stock, plainte, etc.
+    
+    Entités : PRODUCT, ORDER_ID, CATEGORY, PRICE, COLOR, SIZE, CITY, etc.
+    """
+    try:
+        from src.nlp_engine import get_nlp_engine
+        nlp = get_nlp_engine()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Moteur NLP non disponible : {e}")
+    
+    result = nlp.analyser(request.texte)
+    
+    return NLPAnalysisResponse(
+        texte=request.texte,
+        intent=result["intent"],
+        entities=result["entities"],
+        sentiment=result["sentiment"],
+        keywords=result["keywords"]
+    )
+
+
+@app.post("/nlp/intent", tags=["NLP"])
+async def detect_intent(request: NLPAnalysisRequest):
+    """
+    Détecte l'intention de l'utilisateur.
+    
+    Retourne l'intent principal avec un score de confiance,
+    ainsi que les top-3 intents candidats.
+    
+    15 intents supportés : recherche_produit, suivi_commande,
+    retour_remboursement, livraison, paiement, recommandation,
+    compte, stock, promotion, garantie, vendeur, salutation,
+    remerciement, plainte, question_generale.
+    """
+    try:
+        from src.nlp_engine import get_nlp_engine
+        nlp = get_nlp_engine()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"NLP non disponible : {e}")
+    
+    result = nlp.detecter_intent(request.texte, top_k=5)
+    return result
+
+
+@app.post("/nlp/entities", tags=["NLP"])
+async def extract_entities(request: NLPAnalysisRequest):
+    """
+    Extrait les entités nommées (NER) du texte.
+    
+    Types d'entités détectées :
+    - ORDER_ID : numéros de commande
+    - PRODUCT : noms de produits
+    - CATEGORY : catégories
+    - PRICE : montants en euros
+    - COLOR : couleurs
+    - SIZE : tailles
+    - CITY : villes
+    - EMAIL : adresses email
+    - PHONE : numéros de téléphone
+    - DATE : dates
+    """
+    try:
+        from src.nlp_engine import get_nlp_engine
+        nlp = get_nlp_engine()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"NLP non disponible : {e}")
+    
+    entities = nlp.extraire_entites(request.texte)
+    return {"texte": request.texte, "entities": entities, "count": len(entities)}
+
+
+@app.post("/nlp/sentiment", tags=["NLP"])
+async def analyze_sentiment(request: NLPAnalysisRequest):
+    """
+    Analyse le sentiment du texte.
+    
+    Algorithme par lexique pondéré avec gestion des négations.
+    Retourne : label (positif/neutre/négatif), score [-1, +1],
+    et les détails (mots positifs, négatifs, négations détectées).
+    """
+    try:
+        from src.nlp_engine import get_nlp_engine
+        nlp = get_nlp_engine()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"NLP non disponible : {e}")
+    
+    sentiment = nlp.analyser_sentiment(request.texte)
+    return {"texte": request.texte, "sentiment": sentiment}
+
+
+@app.post("/nlp/route", tags=["NLP"])
+async def route_request(request: NLPAnalysisRequest):
+    """
+    Analyse la requête et détermine le module cible.
+    
+    Routing intelligent :
+    - recherche_produit → module recherche/classification
+    - recommandation → module recommandation (SVD)
+    - suivi_commande → module suivi
+    - plainte / sentiment négatif → escalade humain
+    - autre → chatbot RAG (LangChain + ChromaDB)
+    """
+    try:
+        from src.nlp_engine import get_nlp_engine
+        nlp = get_nlp_engine()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"NLP non disponible : {e}")
+    
+    routing = nlp.router_requete(request.texte)
+    return routing
 
 
 # ============================================

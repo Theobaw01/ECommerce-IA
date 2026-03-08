@@ -67,6 +67,26 @@ export interface ChatMessage {
   content: string;
   timestamp?: string;
   sources?: string[];
+  nlp?: {
+    intent: string;
+    intent_confidence: number;
+    sentiment: string;
+    sentiment_score: number;
+    entities: { type: string; value: string }[];
+    keywords: string[];
+  };
+  confiance?: number;
+  escalade_humain?: boolean;
+}
+
+export interface NLPAnalysis {
+  intent: string;
+  intent_confidence: number;
+  sentiment: string;
+  sentiment_score: number;
+  entities: { type: string; value: string }[];
+  keywords: string[];
+  routing: string;
 }
 
 export interface AuthResponse {
@@ -138,8 +158,8 @@ export async function getRecommendations(
   userId: number,
   topN: number = 10
 ): Promise<Recommendation[]> {
-  const { data } = await api.get<Recommendation[]>("/recommend", {
-    params: { user_id: userId, top_n: topN },
+  const { data } = await api.get<Recommendation[]>(`/recommend/${userId}`, {
+    params: { top_n: topN },
   });
   return data;
 }
@@ -148,7 +168,7 @@ export async function getSimilarProducts(
   productId: number,
   topN: number = 8
 ): Promise<Product[]> {
-  const { data } = await api.get<Product[]>(`/similar/${productId}`, {
+  const { data } = await api.get<Product[]>(`/recommend/similar/${productId}`, {
     params: { top_n: topN },
   });
   return data;
@@ -194,7 +214,14 @@ export async function searchProducts(query: string): Promise<Product[]> {
 export async function sendChatMessage(
   message: string,
   sessionId?: string
-): Promise<{ reponse: string; sources: string[]; session_id: string }> {
+): Promise<{
+  reponse: string;
+  sources: string[];
+  session_id: string;
+  nlp?: ChatMessage["nlp"];
+  confiance?: number;
+  escalade_humain?: boolean;
+}> {
   const { data } = await api.post("/chat", {
     message,
     session_id: sessionId,
@@ -236,6 +263,35 @@ export function createChatWebSocket(
   };
 
   return ws;
+}
+
+// ============================================
+// NLP
+// ============================================
+export async function analyzeText(text: string): Promise<NLPAnalysis> {
+  const { data } = await api.post<NLPAnalysis>("/nlp/analyze", { text });
+  return data;
+}
+
+export async function detectIntent(
+  text: string
+): Promise<{ intent: string; confidence: number }> {
+  const { data } = await api.post("/nlp/intent", { text });
+  return data;
+}
+
+export async function extractEntities(
+  text: string
+): Promise<{ type: string; value: string }[]> {
+  const { data } = await api.post("/nlp/entities", { text });
+  return data;
+}
+
+export async function analyzeSentiment(
+  text: string
+): Promise<{ label: string; score: number }> {
+  const { data } = await api.post("/nlp/sentiment", { text });
+  return data;
 }
 
 export default api;

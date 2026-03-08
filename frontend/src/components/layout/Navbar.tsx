@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { FiShoppingBag, FiSearch, FiMessageCircle, FiUser, FiMenu, FiX, FiShoppingCart } from "react-icons/fi";
+import { FiShoppingBag, FiSearch, FiMessageCircle, FiUser, FiMenu, FiX, FiShoppingCart, FiStar } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCartStore } from "@/stores/cartStore";
 import clsx from "clsx";
@@ -11,6 +11,7 @@ import clsx from "clsx";
 const navLinks = [
   { href: "/", label: "Accueil", icon: <FiShoppingBag className="w-4 h-4" /> },
   { href: "/search", label: "Recherche IA", icon: <FiSearch className="w-4 h-4" /> },
+  { href: "/recommendations", label: "Recommandations", icon: <FiStar className="w-4 h-4" /> },
   { href: "/chat", label: "Chatbot", icon: <FiMessageCircle className="w-4 h-4" /> },
   { href: "/profile", label: "Profil", icon: <FiUser className="w-4 h-4" /> },
 ];

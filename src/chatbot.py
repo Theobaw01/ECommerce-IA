@@ -37,6 +37,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
 
+# NLP Engine intégré
+from src.nlp_engine import get_nlp_engine, NLPEngine
+
 # ============================================
 # Configuration
 # ============================================
@@ -279,7 +282,16 @@ class EcommerceChatbot:
         self.llm = None
         self.chain = None
         self.sessions: Dict[str, List[Dict]] = {}
+        self.conversation_memory: Dict[str, List[str]] = {}  # Mémoire multi-turn
         self.is_initialized = False
+        
+        # Intégrer le moteur NLP
+        try:
+            self.nlp_engine = get_nlp_engine()
+            logger.info("🧠 Moteur NLP intégré au chatbot")
+        except Exception as e:
+            logger.warning(f"⚠️  NLP non disponible : {e}")
+            self.nlp_engine = None
         
         logger.info("🤖 Initialisation du chatbot RAG...")
     
@@ -542,18 +554,21 @@ Réponse :"""
         """
         Génère une réponse à une question utilisateur.
         
-        Pipeline :
-        1. Rechercher le contexte pertinent
-        2. Générer la réponse avec le LLM (ou template)
-        3. Calculer le score de confiance
-        4. Escalade humain si confiance < 0.6
+        Pipeline NLP + RAG :
+        1. Analyse NLP : intent, entités, sentiment
+        2. Routing intelligent selon l'intent
+        3. Construction du contexte avec mémoire conversationnelle
+        4. Recherche RAG dans ChromaDB (top-3 chunks)
+        5. Génération de réponse contextuelle (LLM ou template)
+        6. Scoring de confiance
+        7. Escalade humain si confiance < 0.6 ou sentiment négatif
         
         Args:
             question: Question de l'utilisateur
             session_id: ID de session pour l'historique
         
         Returns:
-            Dictionnaire avec réponse, confiance, sources
+            Dictionnaire avec réponse, confiance, sources, analyse NLP
         """
         if session_id is None:
             session_id = str(uuid.uuid4())
@@ -561,49 +576,127 @@ Réponse :"""
         # Initialiser la session si nécessaire
         if session_id not in self.sessions:
             self.sessions[session_id] = []
+        if session_id not in self.conversation_memory:
+            self.conversation_memory[session_id] = []
+        
+        # ── ÉTAPE 1 : Analyse NLP ──
+        nlp_result = None
+        intent_info = {"intent": "question_generale", "confidence": 0.0}
+        sentiment_info = {"label": "neutre", "score": 0.0}
+        entities = []
+        keywords = []
+        
+        if self.nlp_engine:
+            nlp_result = self.nlp_engine.analyser(question)
+            intent_info = nlp_result.get("intent", intent_info)
+            sentiment_info = nlp_result.get("sentiment", sentiment_info)
+            entities = nlp_result.get("entities", [])
+            keywords = nlp_result.get("keywords", [])
+            
+            logger.info(
+                f"🧠 NLP → Intent: {intent_info['intent']} "
+                f"({intent_info['confidence']:.0%}) | "
+                f"Sentiment: {sentiment_info['label']} | "
+                f"Entités: {len(entities)}"
+            )
+        
+        # ── ÉTAPE 2 : Gestion de la mémoire conversationnelle ──
+        # Garder les 5 derniers échanges comme contexte
+        self.conversation_memory[session_id].append(question)
+        if len(self.conversation_memory[session_id]) > 10:
+            self.conversation_memory[session_id] = self.conversation_memory[session_id][-10:]
+        
+        # Enrichir la requête avec le contexte conversationnel
+        enriched_query = question
+        if len(self.conversation_memory[session_id]) > 1:
+            previous = self.conversation_memory[session_id][-3:-1]
+            enriched_query = " ".join(previous) + " " + question
         
         # Ajouter la question à l'historique
         self.sessions[session_id].append({
             "role": "user",
             "content": question,
+            "nlp": {
+                "intent": intent_info["intent"],
+                "intent_confidence": intent_info["confidence"],
+                "sentiment": sentiment_info["label"],
+                "sentiment_score": sentiment_info["score"],
+                "entities": entities,
+            },
             "timestamp": datetime.now().isoformat()
         })
         
-        # Rechercher le contexte
-        context_docs = self.rechercher_contexte(question)
+        # ── ÉTAPE 3 : Routing intelligent ──
+        intent = intent_info["intent"]
         
-        # Calculer la confiance (basée sur le score de recherche)
-        if context_docs:
-            confidence = max(doc["score"] for doc in context_docs)
-            # Normaliser entre 0 et 1
-            confidence = min(1.0, max(0.0, 1.0 - confidence))  # ChromaDB: distance → plus bas = mieux
+        # Réponses directes pour salutations/remerciements
+        if intent == "salutation" and intent_info["confidence"] > 0.3:
+            reponse = self._reponse_salutation()
+            sources = []
+            confidence = 0.95
+        elif intent == "remerciement" and intent_info["confidence"] > 0.3:
+            reponse = self._reponse_remerciement()
+            sources = []
+            confidence = 0.95
+        elif intent == "suivi_commande":
+            # Extraire l'ID de commande des entités
+            order_ids = [e["value"] for e in entities if e["type"] == "ORDER_ID"]
+            order_id = order_ids[0] if order_ids else "inconnue"
+            suivi = self.suivre_commande(order_id)
+            reponse = suivi["message"]
+            sources = ["Système de suivi interne"]
+            confidence = 0.90
+        elif intent == "stock":
+            product_names = [e["value"] for e in entities if e["type"] == "PRODUCT"]
+            pid = product_names[0] if product_names else "inconnu"
+            stock = self.verifier_stock(pid)
+            reponse = stock["message"]
+            sources = ["Système de gestion de stock"]
+            confidence = 0.90
         else:
-            confidence = 0.0
-        
-        # Générer la réponse
-        if self.chain is not None:
-            try:
-                result = self.chain({"query": question})
-                reponse = result["result"]
-                sources = [
-                    doc.page_content[:100]
-                    for doc in result.get("source_documents", [])
-                ]
-            except Exception as e:
-                logger.warning(f"⚠️  Erreur génération : {e}")
+            # ── ÉTAPE 4 : Recherche RAG dans ChromaDB ──
+            context_docs = self.rechercher_contexte(enriched_query)
+            
+            # Calculer la confiance (basée sur le score de recherche)
+            if context_docs:
+                confidence = max(doc["score"] for doc in context_docs)
+                # Normaliser entre 0 et 1
+                confidence = min(1.0, max(0.0, 1.0 - confidence))  # ChromaDB: distance → plus bas = mieux
+            else:
+                confidence = 0.0
+            
+            # ── ÉTAPE 5 : Génération de réponse ──
+            if self.chain is not None:
+                try:
+                    result = self.chain({"query": enriched_query})
+                    reponse = result["result"]
+                    sources = [
+                        doc.page_content[:100]
+                        for doc in result.get("source_documents", [])
+                    ]
+                except Exception as e:
+                    logger.warning(f"⚠️  Erreur génération : {e}")
+                    reponse, sources = self._generer_reponse_template(question, context_docs)
+            else:
                 reponse, sources = self._generer_reponse_template(question, context_docs)
-        else:
-            reponse, sources = self._generer_reponse_template(question, context_docs)
         
-        # Escalade humain si confiance < seuil
+        # ── ÉTAPE 6 : Ajustements post-traitement ──
+        # Escalade humain si confiance < seuil OU sentiment très négatif
         escalade = confidence < self.config["confidence_threshold"]
-        if escalade:
+        if sentiment_info["score"] < -0.5:
+            escalade = True
+            reponse += (
+                "\n\n😟 Je comprends votre frustration. "
+                "Je vous met en relation avec un conseiller humain "
+                "qui pourra traiter votre demande en priorité."
+            )
+        elif escalade:
             reponse += (
                 "\n\n🔄 Je ne suis pas totalement sûr de cette réponse. "
                 "Souhaitez-vous être mis en contact avec un conseiller humain ?"
             )
         
-        # Construire la réponse
+        # Construire la réponse enrichie
         response = {
             "session_id": session_id,
             "question": question,
@@ -611,7 +704,16 @@ Réponse :"""
             "confiance": float(confidence),
             "sources": sources,
             "escalade_humain": escalade,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            # Données NLP pour le frontend
+            "nlp": {
+                "intent": intent_info["intent"],
+                "intent_confidence": float(intent_info["confidence"]),
+                "sentiment": sentiment_info["label"],
+                "sentiment_score": float(sentiment_info["score"]),
+                "entities": entities,
+                "keywords": [k["mot"] for k in keywords[:5]] if keywords else [],
+            }
         }
         
         # Ajouter à l'historique
@@ -623,6 +725,26 @@ Réponse :"""
         })
         
         return response
+    
+    def _reponse_salutation(self) -> str:
+        """Génère une réponse de salutation."""
+        import random
+        salutations = [
+            "Bonjour ! 👋 Comment puis-je vous aider aujourd'hui ?",
+            "Bonjour et bienvenue ! 🛍️ Je suis votre assistant IA. Que puis-je faire pour vous ?",
+            "Bonjour ! 😊 N'hésitez pas à me poser vos questions sur nos produits, livraisons, ou votre compte.",
+        ]
+        return random.choice(salutations)
+    
+    def _reponse_remerciement(self) -> str:
+        """Génère une réponse aux remerciements."""
+        import random
+        remerciements = [
+            "De rien ! 😊 N'hésitez pas si vous avez d'autres questions.",
+            "Avec plaisir ! 🎉 Je suis là pour vous aider.",
+            "Je vous en prie ! Bonne continuation sur notre plateforme. 🛍️",
+        ]
+        return random.choice(remerciements)
     
     def _generer_reponse_template(
         self,
