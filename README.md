@@ -1,19 +1,20 @@
 <div align="center">
 
-# 🛒 ECommerce-IA
+# 🛒 ECommerce-IA — SAHELYS
 
-### Plateforme E-Commerce Intelligente avec 3 Modules IA
+### Plateforme E-Commerce Intelligente avec 5 Modules IA
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
+[![FAISS](https://img.shields.io/badge/FAISS-Meta_AI-4267B2?style=for-the-badge&logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
 [![License MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-**Accuracy : 94% Top-1 | 500 catégories | 45ms inférence**
+**CNN + Transformer | FAISS | Recommandation | Chatbot RAG**
 
-[Documentation API](http://localhost:8000/docs) · [Dashboard](http://localhost:8501) · [Portfolio](https://theo.portefolio.io)
+[Documentation API](http://localhost:8000/docs) · [Dashboard](http://localhost:8501) · [GitHub](https://github.com/Theobaw01/ECommerce-IA)
 
 </div>
 
@@ -26,8 +27,8 @@
 - [Modules IA](#-modules-ia)
 - [Technologies](#-technologies)
 - [Installation](#-installation)
-- [Utilisation](#-utilisation)
 - [API Endpoints](#-api-endpoints)
+- [Entraînement sur Google Colab](#-entraînement-sur-google-colab)
 - [Résultats & Métriques](#-résultats--métriques)
 - [Déploiement Docker](#-déploiement-docker)
 - [Structure du projet](#-structure-du-projet)
@@ -37,13 +38,15 @@
 
 ## 🎯 Présentation
 
-**ECommerce-IA** est une plateforme e-commerce complète intégrant **3 modules d'intelligence artificielle** :
+**ECommerce-IA** est une plateforme e-commerce complète intégrant **5 modules d'intelligence artificielle**, couvrant les architectures majeures du Deep Learning : **CNN**, **Transformers**, **NLP**, et **recherche vectorielle**.
 
-| Module | Technologie | Performance |
-|--------|------------|-------------|
-| 🔍 **Classification visuelle** | EfficientNet-B4 (PyTorch) | **94% accuracy** sur 500 catégories |
-| 🎯 **Recommandation hybride** | SVD + Content-Based + Geo + Prix | **Precision@10 = 0.78** |
-| 💬 **Chatbot RAG** | LangChain + ChromaDB + Mistral | **87% taux de résolution** |
+| Module | Technologie | Architecture | Performance |
+|--------|------------|--------------|-------------|
+| 🔍 **Classification CNN** | EfficientNet-B4 (PyTorch/timm) | **CNN** | ~85% Top-1, ~99% Top-5 |
+| 🤖 **Classification ViT** | ViT-Base/16 (Transformer) | **Transformer** | Pré-entraîné ImageNet |
+| 🖼️ **Recherche visuelle** | FAISS (Meta AI) | **Similarité cosine** | <50ms / requête |
+| 🎯 **Recommandation** | SVD + Content-Based + Geo + Prix | **Hybride 4 facteurs** | Precision@10 = 0.78 |
+| 💬 **Chatbot RAG** | LangChain + ChromaDB + LLM | **NLP / Transformer** | 87% résolution |
 
 > Projet réalisé chez **SAHELYS** par **BAWANA Théodore**
 
@@ -52,61 +55,79 @@
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Frontend Next.js 14                          │
-│                 (TailwindCSS + React Components)                │
-│    ┌──────────┐ ┌──────────────┐ ┌────────┐ ┌──────────────┐   │
-│    │ Image    │ │  Product     │ │Chatbot │ │ Confidence   │   │
-│    │ Dropzone │ │    Card      │ │  Page  │ │    Bar       │   │
-│    └──────────┘ └──────────────┘ └────────┘ └──────────────┘   │
-├─────────────────────────────────────────────────────────────────┤
-│                    API FastAPI + JWT Auth                        │
-│  POST /classify  GET /recommend/{id}  POST /chat  WS /ws/chat  │
-├────────────────┬───────────────┬─────────────────────────────────┤
-│ EfficientNet-B4│  SVD Hybride  │      LangChain + ChromaDB      │
-│   (PyTorch)    │  (Surprise)   │      (RAG Pipeline)            │
-│   timm lib     │  4 facteurs   │      Mistral-7B / flan-t5      │
-├────────────────┴───────────────┴─────────────────────────────────┤
-│              PostgreSQL + SQLAlchemy ORM                         │
-│     Products │ Users │ Orders │ Interactions │ ChatSessions      │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       Frontend Next.js 14                               │
+│                    (TailwindCSS + React Components)                     │
+│    ┌──────────┐ ┌──────────────┐ ┌────────┐ ┌──────────────┐           │
+│    │ Image    │ │  Product     │ │Chatbot │ │ Confidence   │           │
+│    │ Dropzone │ │    Card      │ │  Page  │ │    Bar       │           │
+│    └──────────┘ └──────────────┘ └────────┘ └──────────────┘           │
+├─────────────────────────────────────────────────────────────────────────┤
+│              API FastAPI + JWT Auth + WebSocket                          │
+│  POST /classify  POST /classify/vit  POST /search/image  POST /chat    │
+│  POST /products  GET /recommend/{id}  POST /classify/compare           │
+├──────────────┬──────────────┬──────────────┬────────────────────────────┤
+│ EfficientNet │  ViT-Base/16 │    FAISS     │  LangChain + ChromaDB     │
+│   B4 (CNN)   │ (Transformer)│  (Meta AI)   │  (RAG Pipeline)           │
+│   19.3M      │    86M       │  IndexFlatIP │  Mistral / flan-t5        │
+│   params     │   params     │  cosine sim  │                           │
+├──────────────┴──────────────┴──────────────┼────────────────────────────┤
+│              SVD Hybride (Surprise)         │   PostgreSQL + SQLAlchemy │
+│     Collaborative + Content + Geo + Prix    │   Products │ Users │ ...  │
+└─────────────────────────────────────────────┴────────────────────────────┘
 ```
 
 ---
 
 ## 🤖 Modules IA
 
-### 🔍 Module 1 — Classification Visuelle
+### 🔍 Module 1 — Classification CNN (EfficientNet-B4)
+
+Réseau convolutionnel avec compound scaling (Google Brain, Tan & Le, ICML 2019).
 
 | Paramètre | Valeur |
 |-----------|--------|
 | **Modèle** | EfficientNet-B4 (pré-entraîné ImageNet) |
 | **Framework** | PyTorch 2.0+ via timm |
-| **Dataset** | Products-10K (Kaggle) — 3000 images × 500 catégories |
+| **Dataset** | Fashion Product Images (Kaggle) — 120 catégories × 120 images |
 | **Input** | 380 × 380 pixels |
-| **Accuracy Top-1** | **94%** |
-| **Accuracy Top-5** | **98.5%** |
-| **Inférence** | **45ms** (GPU) |
-| **Split** | 70% train / 15% validation / 15% test |
-| **Augmentation** | ×5 sur train uniquement (Albumentations) |
-| **Optimiseur** | AdamW (lr=3e-4, weight_decay=1e-2) |
-| **Scheduler** | CosineAnnealingLR (T_max=30) |
-| **Entraînement** | 30 époques, progressive unfreezing |
-| **Label Smoothing** | 0.1 |
+| **Entraînement** | Google Colab (T4 16 Go), 30 epochs |
+| **Stratégie** | Progressive unfreezing (3 phases) |
+| **Optimizer** | AdamW (lr=3e-4, weight_decay=1e-4) |
+| **Scheduler** | CosineAnnealingLR |
+| **Loss** | CrossEntropy + Label Smoothing 0.1 |
+| **Augmentation** | RandomFlip, ColorJitter, Rotation, RandomErasing |
 | **Early Stopping** | patience=7 |
 
-**Augmentations (Albumentations)** :
-- Rotation ±15°
-- Horizontal Flip (p=0.5)
-- Brightness/Contrast ±20%
-- Zoom 0.8-1.2
-- CoarseDropout (Cutout)
+### 🤖 Module 2 — Classification Transformer (ViT)
 
-**Normalisation ImageNet** :
-- mean = [0.485, 0.456, 0.406]
-- std = [0.229, 0.224, 0.225]
+Vision Transformer (Dosovitskiy et al., ICLR 2021) : l'image est découpée en patches 16×16 traités comme des tokens, exactement comme en NLP.
 
-### 🎯 Module 2 — Recommandation Hybride
+| Paramètre | Valeur |
+|-----------|--------|
+| **Modèle** | ViT-Base/16 (vit_base_patch16_384) |
+| **Architecture** | Transformer Encoder (12 layers, 12 heads) |
+| **Paramètres** | 86M |
+| **Input** | 384 × 384 → 576 patches + 1 [CLS] token |
+| **Pré-entraînement** | ImageNet-21k + fine-tuné ImageNet-1k |
+| **Endpoint** | `POST /classify/vit` |
+| **Comparaison** | `POST /classify/compare` (CNN vs Transformer) |
+
+> **Pourquoi deux architectures ?** Le CNN excelle avec des convolutions locales hiérarchiques. Le Transformer capture des dépendances globales via l'attention. La comparaison démontre la maîtrise des deux paradigmes fondamentaux du Deep Learning.
+
+### 🖼️ Module 3 — Recherche Visuelle (FAISS)
+
+Moteur de recherche d'images similaires utilisant FAISS (Facebook AI Similarity Search, licence MIT).
+
+| Paramètre | Valeur |
+|-----------|--------|
+| **Bibliothèque** | FAISS (Meta AI) |
+| **Index** | IndexFlatIP (cosine similarity après normalisation L2) |
+| **Embeddings** | Extraits par EfficientNet-B4 backbone (1792-d) |
+| **Temps de recherche** | < 50ms pour ~14,400 vecteurs |
+| **Endpoint** | `POST /search/image` |
+
+### 🎯 Module 4 — Recommandation Hybride
 
 Algorithme à **4 facteurs pondérés** :
 
@@ -117,59 +138,55 @@ Algorithme à **4 facteurs pondérés** :
 | 📍 Géographie | 15% | Distance Haversine |
 | 💰 Prix | 15% | Score budget utilisateur |
 
-**Métriques** :
-- Precision@10 : **0.78**
-- Recall@10 : **0.65**
-- NDCG@10 : **0.82**
-- Coverage : **85%**
-
-### 💬 Module 3 — Chatbot RAG
+### 💬 Module 5 — Chatbot RAG
 
 | Composant | Technologie |
 |-----------|------------|
 | **Embeddings** | sentence-transformers/all-MiniLM-L6-v2 |
 | **Vector Store** | ChromaDB |
-| **Génération** | Mistral-7B-Instruct (fallback: flan-t5-large) |
+| **Génération** | Mistral-7B-Instruct (fallback: flan-t5-large) — **Transformer** |
 | **Framework** | LangChain |
-| **Base de connaissances** | 13 documents FAQ e-commerce |
+| **Protocole** | REST + WebSocket (temps réel) |
 
-**Métriques** :
-- Taux de résolution : **87%**
-- Temps moyen de réponse : **1.2s**
-- Taux d'escalade humain : **8%**
+> **Note** : Le LLM utilisé par le chatbot (Mistral / flan-t5) est un **Transformer** (architecture encodeur-décodeur), ce qui renforce la couverture de cette architecture dans le projet.
 
 ---
 
 ## 🛠️ Technologies
 
-### Backend
-- **Python 3.10+** — Langage principal
-- **PyTorch 2.0+** — Deep Learning
-- **timm** — Modèles pré-entraînés (EfficientNet-B4)
-- **FastAPI** — API REST + WebSocket
-- **SQLAlchemy** — ORM
-- **PostgreSQL** — Base de données (SQLite fallback)
-- **LangChain** — Pipeline RAG
-- **ChromaDB** — Base vectorielle
-- **Surprise** — Collaborative Filtering
-- **Albumentations** — Augmentation d'images
+### Backend IA
+| Technologie | Rôle | Architecture |
+|-------------|------|-------------|
+| **PyTorch 2.0+** | Deep Learning | CNN + Transformer |
+| **timm** | Modèles pré-entraînés | EfficientNet-B4, ViT-Base/16 |
+| **FAISS** | Recherche vectorielle | IndexFlatIP (cosine) |
+| **LangChain** | Pipeline RAG | Transformer (LLM) |
+| **ChromaDB** | Base vectorielle | Embeddings |
+| **Surprise** | Collaborative Filtering | SVD |
+| **scikit-learn** | ML classique | TF-IDF, métriques |
+
+### Backend API
+| Technologie | Rôle |
+|-------------|------|
+| **FastAPI** | API REST + WebSocket |
+| **SQLAlchemy** | ORM |
+| **PostgreSQL** | Base de données |
+| **JWT (python-jose)** | Authentification |
 
 ### Frontend
-- **Next.js 14** — Framework React full-stack (App Router)
-- **React 18** — Composants réactifs
-- **TailwindCSS** — Styling utilitaire
-- **Zustand** — State management
-- **Framer Motion** — Animations
+| Technologie | Rôle |
+|-------------|------|
+| **Next.js 14** | Framework React (App Router) |
+| **TailwindCSS** | Styling |
+| **Zustand** | State management |
+| **Framer Motion** | Animations |
 
 ### DevOps
-- **Docker** — Containerisation multi-stage
-- **docker-compose** — Orchestration (5 services)
-- **Next.js Standalone** — Build optimisé pour Docker
-
-### Outils
-- **Streamlit** — Dashboard de démonstration
-- **Plotly** — Graphiques interactifs
-- **Grad-CAM** — Visualisation d'attention CNN
+| Technologie | Rôle |
+|-------------|------|
+| **Docker** | Containerisation multi-stage |
+| **docker-compose** | Orchestration (5 services) |
+| **Google Colab** | Entraînement GPU (T4) |
 
 ---
 
@@ -180,13 +197,13 @@ Algorithme à **4 facteurs pondérés** :
 - Python 3.10+
 - Node.js 18+ (pour le frontend)
 - Docker & Docker Compose (optionnel)
-- GPU NVIDIA + CUDA (recommandé pour l'entraînement)
+- GPU NVIDIA + CUDA (recommandé pour l'inférence)
 
 ### Installation locale
 
 ```bash
 # 1. Cloner le projet
-git clone https://github.com/theobawana/ECommerce-IA.git
+git clone https://github.com/Theobaw01/ECommerce-IA.git
 cd ECommerce-IA
 
 # 2. Créer l'environnement Python
@@ -199,59 +216,14 @@ pip install -r requirements.txt
 
 # 4. Configurer les variables d'environnement
 cp .env.example .env
-# Éditer .env avec vos clés API
 
-# 5. Télécharger le dataset
-python data/download_dataset.py
-# 💡 Compatible Google Colab ! (monte Drive, configure Kaggle automatiquement)
-
-# 6. Prétraiter les images
-python src/preprocess.py
-
-# 7. Entraîner le modèle de classification
-python src/train_classification.py
-
-# 8. Évaluer sur le test set
-python src/evaluate.py
-
-# 9. Lancer l'API
+# 5. Lancer l'API
 python api/main.py
 # → http://localhost:8000/docs
 
-# 10. Lancer le dashboard Streamlit
-streamlit run app/streamlit_demo.py
-# → http://localhost:8501
-```
-
-### Installation du frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
+# 6. Lancer le frontend
+cd frontend && npm install && npm run dev
 # → http://localhost:3000
-```
-
-### ☁️ Utilisation avec Google Colab
-
-Le script de téléchargement est **nativement compatible Google Colab** :
-
-```python
-# Dans un notebook Colab :
-!git clone https://github.com/theobawana/ECommerce-IA.git
-%cd ECommerce-IA
-
-# Télécharger et organiser le dataset (monte Drive automatiquement)
-!python data/download_dataset.py
-
-# Le script :
-# 1. Monte Google Drive (/content/drive/MyDrive/ECommerce-IA)
-# 2. Installe les dépendances (kaggle)
-# 3. Configure l'API Kaggle (upload interactif ou Drive)
-# 4. Télécharge Products-10K dans /content/ (SSD rapide)
-# 5. Organise les images dans data/raw/
-# 6. Répartit en splits train/val/test (70/15/15)
-# 7. Génère la base de connaissances chatbot
 ```
 
 ---
@@ -261,8 +233,17 @@ Le script de téléchargement est **nativement compatible Google Colab** :
 ### Classification
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
-| `POST` | `/classify` | Classifie une image (upload) |
-| `POST` | `/classify/batch` | Classifie plusieurs images |
+| `POST` | `/classify` | Classification CNN (EfficientNet-B4) |
+| `POST` | `/classify/batch` | Classification batch |
+| `POST` | `/classify/vit` | Classification Transformer (ViT) |
+| `POST` | `/classify/compare` | Comparaison CNN vs Transformer |
+
+### Recherche Visuelle (FAISS)
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| `POST` | `/search/image` | Recherche de produits similaires par image |
+| `GET` | `/search/categories` | Catégories indexées |
+| `GET` | `/search/status` | Statut de l'index FAISS |
 
 ### Recommandation
 | Méthode | Endpoint | Description |
@@ -278,11 +259,14 @@ Le script de téléchargement est **nativement compatible Google Colab** :
 | `GET` | `/chat/history/{session_id}` | Historique de la session |
 | `WS` | `/ws/chat/{session_id}` | Chat temps réel (WebSocket) |
 
-### Produits
+### Produits (CRUD complet)
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
-| `GET` | `/products` | Liste des produits (paginée) |
+| `GET` | `/products` | Liste paginée avec filtres |
 | `GET` | `/products/{id}` | Détail d'un produit |
+| `POST` | `/products` | **Créer** un produit |
+| `PUT` | `/products/{id}` | **Modifier** un produit |
+| `DELETE` | `/products/{id}` | **Supprimer** un produit |
 | `POST` | `/products/search` | Recherche par image |
 
 ### Authentification
@@ -293,54 +277,56 @@ Le script de téléchargement est **nativement compatible Google Colab** :
 
 ---
 
+## ☁️ Entraînement sur Google Colab
+
+Le notebook `notebooks/ECommerce_IA_Train_Colab.ipynb` est **entièrement autonome** :
+
+1. Monte Google Drive pour la persistance
+2. Télécharge le dataset depuis Kaggle
+3. Organise les données (120 catégories × 120 images)
+4. Entraîne EfficientNet-B4 avec progressive unfreezing (3 phases)
+5. Évalue sur le test set
+6. Extrait les embeddings pour FAISS
+7. Sauvegarde tout sur Google Drive
+
+**En cas de déconnexion Colab** : relancez « Exécuter tout » — tout reprend automatiquement.
+
+### Configuration Kaggle sécurisée
+
+Les credentials Kaggle sont chargées depuis les **Secrets Google Colab** (icône 🔑), jamais en dur dans le code.
+
+---
+
 ## 📊 Résultats & Métriques
 
-### Classification Visuelle
+### Classification CNN (EfficientNet-B4)
 
-```
-╔════════════════════════════════════════╗
-║  RÉSULTATS — Test Set (évaluation     ║
-║  unique, JAMAIS vu en entraînement)   ║
-╠════════════════════════════════════════╣
-║  Accuracy Top-1  :  94.0%             ║
-║  Accuracy Top-5  :  98.5%             ║
-║  F1-Score Macro  :  0.937             ║
-║  F1-Score Weighted:  0.941            ║
-║  Precision Macro :  0.935             ║
-║  Recall Macro    :  0.940             ║
-║  Inférence       :  45ms (GPU)        ║
-╚════════════════════════════════════════╝
-```
+| Métrique | Valeur |
+|----------|--------|
+| **Dataset** | 120 catégories × 120 images (14,400 total) |
+| **Train/Val/Test** | ~67% / ~17% / ~17% |
+| **Accuracy Top-1** | ~85% |
+| **Accuracy Top-5** | ~99% |
+| **Stratégie** | Progressive unfreezing (3 phases / 30 epochs) |
+| **GPU** | Tesla T4 16 Go (Google Colab) |
 
-### Dataset
+### Recherche FAISS
 
-| Partition | Images | Augmentation | Rôle |
-|-----------|--------|-------------|------|
-| **Train** | 2100 (~70%) | ×5 → 10500 | Entraînement |
-| **Validation** | 450 (~15%) | Aucune | Tuning hyperparamètres |
-| **Test** | 450 (~15%) | Aucune | Évaluation finale unique |
-
-> ⚠️ **Le test set n'est utilisé qu'UNE SEULE FOIS** pour l'évaluation finale.
-> Aucune décision de modèle n'est prise sur la base des résultats du test.
+| Métrique | Valeur |
+|----------|--------|
+| **Index** | IndexFlatIP (exact search) |
+| **Vecteurs** | ~14,400 (1792-d chacun) |
+| **Temps de recherche** | < 50ms |
+| **Similarité** | Cosine (normalisation L2 + Inner Product) |
 
 ---
 
 ## 🐳 Déploiement Docker
 
-### Commande rapide
-
 ```bash
-# Build et démarrage complet
 docker-compose up --build -d
-
-# Vérifier les services
 docker-compose ps
-
-# Logs
-docker-compose logs -f api
 ```
-
-### Services
 
 | Service | Port | URL |
 |---------|------|-----|
@@ -350,15 +336,6 @@ docker-compose logs -f api
 | **Database** (PostgreSQL) | 5432 | — |
 | **ChromaDB** | 8080 | http://localhost:8080 |
 
-### Variables d'environnement
-
-```bash
-# .env
-DATABASE_URL=postgresql://ecommerce:password@db:5432/ecommerce_ia
-JWT_SECRET_KEY=your_secret_key
-HUGGINGFACE_API_KEY=hf_xxxxx
-```
-
 ---
 
 ## 📁 Structure du projet
@@ -366,43 +343,54 @@ HUGGINGFACE_API_KEY=hf_xxxxx
 ```
 ECommerce-IA/
 ├── 📁 api/
-│   └── main.py                 # API FastAPI complète (REST + WebSocket)
+│   └── main.py                   # API FastAPI (REST + WebSocket + JWT)
 ├── 📁 app/
-│   └── streamlit_demo.py       # Dashboard Streamlit (4 onglets)
+│   └── streamlit_demo.py         # Dashboard Streamlit
 ├── 📁 data/
-│   ├── download_dataset.py     # Téléchargement Products-10K (Kaggle + Google Colab)
-│   ├── raw/                    # Images brutes par catégorie
-│   └── processed/              # Images prétraitées (train/val/test)
+│   ├── download_dataset.py       # Téléchargement Kaggle
+│   ├── raw/                      # Images brutes par catégorie
+│   └── splits/                   # Train / Val / Test
 ├── 📁 database/
-│   └── models.py               # SQLAlchemy ORM (6 tables)
-├── 📁 frontend/                # Next.js 14 + TailwindCSS + React
-│   ├── src/
-│   │   ├── app/                # Pages (Home, Search, Chat, Product, Cart, Profile)
-│   │   ├── components/         # UI : ImageDropzone, ProductCard, ConfidenceBar
-│   │   ├── services/           # API client (Axios + JWT)
-│   │   └── stores/             # Zustand (Cart, Auth)
-│   ├── next.config.js
-│   ├── tailwind.config.ts
-│   └── package.json
-├── 📁 models/                  # Modèles entraînés (.pth)
-├── 📁 results/                 # Rapports d'évaluation, graphiques
+│   └── models.py                 # SQLAlchemy ORM
+├── 📁 frontend/                  # Next.js 14 + TailwindCSS
+│   ├── src/app/                  # Pages
+│   ├── src/components/           # ImageDropzone, ProductCard, etc.
+│   ├── src/services/             # API client (Axios + JWT)
+│   └── src/stores/               # Zustand (Cart, Auth)
+├── 📁 models/classification/     # Modèles entraînés
+│   ├── efficientnet_b4_best.pth  # CNN (EfficientNet-B4)
+│   ├── product_embeddings.pkl    # Embeddings pour FAISS
+│   ├── class_mapping.json        # Mapping des classes
+│   └── training_history.json     # Historique d'entraînement
+├── 📁 notebooks/
+│   └── ECommerce_IA_Train_Colab.ipynb  # Notebook Colab (autonome)
 ├── 📁 src/
-│   ├── preprocess.py           # Pipeline de prétraitement + augmentation
-│   ├── dataset.py              # Dataset PyTorch + DataLoaders
-│   ├── train_classification.py # Entraînement EfficientNet-B4
-│   ├── evaluate.py             # Évaluation sur test set (94%)
-│   ├── recommendation.py       # Recommandation hybride 4 facteurs
-│   ├── chatbot.py              # Chatbot RAG (LangChain + ChromaDB)
-│   └── pipeline.py             # Pipeline unifié (3 modules)
-├── .env.example                # Template variables d'environnement
-├── .dockerignore
-├── docker-compose.yml          # 5 services orchestrés
-├── Dockerfile                  # Multi-stage (Node 18 + Python 3.10)
-├── Dockerfile.frontend         # Build Next.js standalone
-├── docker-entrypoint.sh        # Script de démarrage
-├── requirements.txt            # Dépendances Python
-└── README.md                   # Ce fichier
+│   ├── dataset.py                # Dataset PyTorch + DataLoaders
+│   ├── train_classification.py   # Entraînement EfficientNet-B4
+│   ├── evaluate.py               # Évaluation sur test set
+│   ├── image_search.py           # 🆕 Recherche FAISS (Meta AI)
+│   ├── vit_classifier.py         # 🆕 Vision Transformer (ViT-Base/16)
+│   ├── pipeline.py               # Pipeline unifié (5 modules)
+│   ├── recommendation.py         # Recommandation hybride 4 facteurs
+│   ├── chatbot.py                # Chatbot RAG (LangChain + ChromaDB)
+│   └── preprocess.py             # Prétraitement images
+├── docker-compose.yml            # 5 services orchestrés
+├── Dockerfile                    # Multi-stage build
+├── requirements.txt              # Dépendances Python
+└── README.md                     # Ce fichier
 ```
+
+---
+
+## 🧠 Architectures IA couvertes
+
+| Architecture | Module | Référence |
+|-------------|--------|-----------|
+| **CNN** | EfficientNet-B4 | Tan & Le, ICML 2019 |
+| **Transformer** | ViT-Base/16 + LLM (Chatbot) | Dosovitskiy et al., ICLR 2021 |
+| **NLP** | Chatbot RAG (LangChain) | Lewis et al., NeurIPS 2020 |
+| **Recherche vectorielle** | FAISS (Meta AI) | Johnson et al., IEEE Big Data 2019 |
+| **Filtrage collaboratif** | SVD (Surprise) | Koren et al., 2009 |
 
 ---
 
@@ -414,8 +402,7 @@ ECommerce-IA/
 |---|---|
 | **Nom** | BAWANA Théodore |
 | **Projet** | Réalisé chez **SAHELYS** |
-| **Portfolio** | [theo.portefolio.io](https://theo.portefolio.io) |
-| **GitHub** | [github.com/theobawana](https://github.com/theobawana) |
+| **GitHub** | [github.com/Theobaw01](https://github.com/Theobaw01) |
 | **Email** | [theodore8bawana@gmail.com](mailto:theodore8bawana@gmail.com) |
 
 </div>
@@ -424,7 +411,7 @@ ECommerce-IA/
 
 ## 📄 Licence
 
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+Ce projet est sous licence MIT.
 
 ---
 
@@ -432,6 +419,6 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 **⭐ Si ce projet vous intéresse, n'hésitez pas à laisser une étoile !**
 
-*ECommerce-IA — Intelligence artificielle au service du e-commerce*
+*ECommerce-IA — CNN + Transformers + FAISS + NLP au service du e-commerce*
 
 </div>

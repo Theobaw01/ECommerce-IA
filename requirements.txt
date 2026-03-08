@@ -28,6 +28,9 @@ numpy>=1.24.0
 pandas>=2.0.0
 kaggle>=1.5.0
 
+# Recherche d'images (FAISS — Facebook AI)
+faiss-cpu>=1.7.0
+
 # API & Backend
 fastapi>=0.104.0
 uvicorn>=0.24.0

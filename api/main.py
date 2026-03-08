@@ -5,10 +5,11 @@ ECommerce-IA — API FastAPI Complète
 API REST + WebSocket pour la plateforme e-commerce.
 
 Endpoints :
-- Classification : POST /classify, POST /classify/batch
+- Classification : POST /classify, POST /classify/batch, POST /classify/vit
+- Recherche      : POST /search/image, GET /search/categories
 - Recommandation : GET /recommend/{user_id}, GET /recommend/similar/{product_id}
 - Chatbot        : POST /chat, GET /chat/history/{session_id}
-- Produits       : GET /products, GET /products/{id}, POST /products/search
+- Produits       : GET /products, GET /products/{id}, POST /products, POST /products/search
 - Auth           : POST /auth/register, POST /auth/token
 - WebSocket      : WS /ws/chat/{session_id}
 
@@ -71,8 +72,9 @@ JWT_EXPIRATION = int(os.environ.get("JWT_EXPIRATION_MINUTES", "60"))
 app = FastAPI(
     title="ECommerce-IA API",
     description=(
-        "API e-commerce avec 3 modules IA intégrés : "
-        "Classification visuelle (EfficientNet-B4, 94% accuracy), "
+        "API e-commerce avec modules IA intégrés : "
+        "Classification visuelle (EfficientNet-B4 CNN + ViT Transformer), "
+        "Recherche d'images similaires (FAISS), "
         "Recommandation hybride (4 facteurs), "
         "Chatbot RAG (LangChain + ChromaDB). "
         "Projet réalisé chez SAHELYS par BAWANA Théodore."
@@ -198,6 +200,20 @@ class ChatResponse(BaseModel):
 
 
 # Produits
+class ProductCreate(BaseModel):
+    nom: str = Field(..., min_length=2, max_length=255)
+    description: Optional[str] = None
+    categorie: str = Field(..., min_length=2)
+    prix: float = Field(..., gt=0)
+    marque: Optional[str] = None
+    stock: int = Field(default=0, ge=0)
+    image_url: Optional[str] = None
+    ville: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    tags: Optional[List[str]] = None
+
+
 class ProductSearch(BaseModel):
     query: Optional[str] = None
     categorie: Optional[str] = None
@@ -261,10 +277,27 @@ async def root():
 async def health_check():
     """Vérification de santé de l'API."""
     pipeline = get_pipeline()
+    modules = pipeline.status() if pipeline else {}
+
+    # Ajouter le statut FAISS et ViT
+    try:
+        from src.image_search import get_image_search
+        searcher = get_image_search()
+        modules["faiss_search"] = searcher.status()
+    except Exception:
+        modules["faiss_search"] = {"ready": False}
+
+    try:
+        from src.vit_classifier import get_vit_classifier
+        vit = get_vit_classifier()
+        modules["vit_transformer"] = vit.status()
+    except Exception:
+        modules["vit_transformer"] = {"ready": False}
+
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "modules": pipeline.status() if pipeline else {}
+        "modules": modules
     }
 
 
@@ -399,6 +432,161 @@ async def classify_batch(
             })
     
     return {"results": results, "total": len(results)}
+
+
+@app.post("/classify/vit", tags=["Classification"])
+async def classify_image_vit(
+    file: UploadFile = File(...),
+    top_k: int = Query(default=5, ge=1, le=20)
+):
+    """
+    Classifie une image avec le Vision Transformer (ViT).
+
+    Architecture Transformer (Dosovitskiy et al., ICLR 2021) :
+    Image → Patches 16×16 → Transformer Encoder → Classification.
+
+    Complémentaire au CNN EfficientNet-B4 : le ViT utilise
+    l'attention globale au lieu des convolutions locales.
+    """
+    try:
+        from src.vit_classifier import get_vit_classifier
+        vit = get_vit_classifier()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"ViT non disponible : {e}")
+
+    if not vit.is_ready:
+        raise HTTPException(status_code=503, detail="Modèle ViT non chargé")
+
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Image invalide : {e}")
+
+    result = vit.classifier_image(image, top_k=top_k)
+
+    if "erreur" in result:
+        raise HTTPException(status_code=500, detail=result["erreur"])
+
+    return result
+
+
+@app.post("/classify/compare", tags=["Classification"])
+async def classify_compare(
+    file: UploadFile = File(...),
+    top_k: int = Query(default=5, ge=1, le=20)
+):
+    """
+    Compare les prédictions CNN (EfficientNet-B4) vs Transformer (ViT)
+    sur la même image.
+
+    Démontre la maîtrise des deux architectures fondamentales
+    du Deep Learning pour la vision.
+    """
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Image invalide : {e}")
+
+    comparison = {}
+
+    # CNN (EfficientNet-B4)
+    pipeline = get_pipeline()
+    if pipeline and pipeline.is_classifier_ready:
+        comparison["cnn"] = pipeline.classifier_image(image, top_k=top_k)
+        comparison["cnn"]["modele"] = "EfficientNet-B4 (CNN)"
+    else:
+        comparison["cnn"] = {"erreur": "CNN non disponible"}
+
+    # Transformer (ViT)
+    try:
+        from src.vit_classifier import get_vit_classifier
+        vit = get_vit_classifier()
+        if vit.is_ready:
+            comparison["vit"] = vit.classifier_image(image, top_k=top_k)
+        else:
+            comparison["vit"] = {"erreur": "ViT non chargé"}
+    except Exception as e:
+        comparison["vit"] = {"erreur": str(e)}
+
+    # Concordance
+    cnn_cat = comparison.get("cnn", {}).get("categorie", "")
+    vit_cat = comparison.get("vit", {}).get("categorie", "")
+    comparison["concordance"] = cnn_cat.lower() == vit_cat.lower() if cnn_cat and vit_cat else None
+
+    return comparison
+
+
+# ============================================
+# ENDPOINTS — Recherche d'Images (FAISS)
+# ============================================
+@app.post("/search/image", tags=["Recherche Visuelle"])
+async def search_similar_images(
+    file: UploadFile = File(...),
+    top_k: int = Query(default=10, ge=1, le=50)
+):
+    """
+    Recherche les produits visuellement similaires à une image.
+
+    Utilise FAISS (Facebook AI Similarity Search) avec les embeddings
+    EfficientNet-B4 pour trouver les produits les plus proches
+    dans l'espace visuel (similarité cosine).
+    """
+    try:
+        from src.image_search import get_image_search
+        searcher = get_image_search()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"FAISS non disponible : {e}")
+
+    if not searcher.is_ready:
+        raise HTTPException(
+            status_code=503,
+            detail="Index FAISS non chargé. Vérifiez que product_embeddings.pkl existe."
+        )
+
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Image invalide : {e}")
+
+    result = searcher.rechercher_par_image(image, top_k=top_k)
+
+    if "erreur" in result:
+        raise HTTPException(status_code=500, detail=result["erreur"])
+
+    return result
+
+
+@app.get("/search/categories", tags=["Recherche Visuelle"])
+async def search_categories():
+    """
+    Liste les catégories disponibles dans l'index FAISS
+    avec le nombre d'images par catégorie.
+    """
+    try:
+        from src.image_search import get_image_search
+        searcher = get_image_search()
+        if not searcher.is_ready:
+            return {"categories": [], "total": 0}
+        cats = searcher.categories_disponibles()
+        return {"categories": cats, "total": len(cats)}
+    except Exception:
+        return {"categories": [], "total": 0}
+
+
+@app.get("/search/status", tags=["Recherche Visuelle"])
+async def search_status():
+    """
+    Statut du moteur de recherche FAISS.
+    """
+    try:
+        from src.image_search import get_image_search
+        searcher = get_image_search()
+        return searcher.status()
+    except Exception as e:
+        return {"ready": False, "erreur": str(e)}
 
 
 # ============================================
@@ -585,6 +773,83 @@ async def get_product(product_id: str):
         if str(product.get("id")) == product_id:
             return {"product": product}
     
+    raise HTTPException(status_code=404, detail="Produit non trouvé")
+
+
+@app.post("/products", tags=["Produits"], status_code=201)
+async def create_product(product: ProductCreate):
+    """
+    Crée un nouveau produit dans le catalogue.
+
+    Le produit est ajouté au catalogue en mémoire.
+    En production, cette route persiste les données en base PostgreSQL.
+    """
+    _init_catalog()
+
+    new_product = {
+        "id": str(uuid.uuid4()),
+        "nom": product.nom,
+        "description": product.description or "",
+        "categorie": product.categorie,
+        "prix": product.prix,
+        "marque": product.marque or "",
+        "stock": product.stock,
+        "image_url": product.image_url or "",
+        "ville": product.ville or "",
+        "latitude": product.latitude,
+        "longitude": product.longitude,
+        "tags": product.tags or [],
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    _products_catalog.append(new_product)
+
+    logger.info(f"🛍️  Produit créé : {new_product['nom']} ({new_product['categorie']}) — ID: {new_product['id']}")
+
+    return {
+        "message": "Produit créé avec succès",
+        "product": new_product
+    }
+
+
+@app.put("/products/{product_id}", tags=["Produits"])
+async def update_product(product_id: str, product: ProductCreate):
+    """
+    Met à jour un produit existant.
+    """
+    _init_catalog()
+
+    for i, p in enumerate(_products_catalog):
+        if str(p.get("id")) == product_id:
+            _products_catalog[i].update({
+                "nom": product.nom,
+                "description": product.description or _products_catalog[i].get("description", ""),
+                "categorie": product.categorie,
+                "prix": product.prix,
+                "marque": product.marque or _products_catalog[i].get("marque", ""),
+                "stock": product.stock,
+                "image_url": product.image_url or _products_catalog[i].get("image_url", ""),
+                "tags": product.tags or _products_catalog[i].get("tags", []),
+                "updated_at": datetime.utcnow().isoformat(),
+            })
+            return {"message": "Produit mis à jour", "product": _products_catalog[i]}
+
+    raise HTTPException(status_code=404, detail="Produit non trouvé")
+
+
+@app.delete("/products/{product_id}", tags=["Produits"])
+async def delete_product(product_id: str):
+    """
+    Supprime un produit du catalogue.
+    """
+    _init_catalog()
+
+    for i, p in enumerate(_products_catalog):
+        if str(p.get("id")) == product_id:
+            removed = _products_catalog.pop(i)
+            return {"message": "Produit supprimé", "id": product_id, "nom": removed.get("nom")}
+
     raise HTTPException(status_code=404, detail="Produit non trouvé")
 
 

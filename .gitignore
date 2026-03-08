@@ -39,6 +39,9 @@ models/chatbot/chroma_db/
 .DS_Store
 Thumbs.db
 
+# Kaggle credentials (NEVER commit)
+kaggle.json
+
 # Node
 node_modules/
 frontend/node_modules/
