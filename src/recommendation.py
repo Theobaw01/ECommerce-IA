@@ -211,6 +211,7 @@ class ContentBasedFilter:
     """
     
     def __init__(self):
+        """Initialise le moteur content-based (non entraîné)."""
         self.product_features = None
         self.product_ids = []
         self.similarity_matrix = None

@@ -106,6 +106,7 @@ class PerformanceMetrics:
     """Collecteur de métriques de performance en mémoire."""
 
     def __init__(self):
+        """Initialise le collecteur avec des compteurs à zéro."""
         self.reset()
 
     def reset(self):
@@ -197,10 +198,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     SKIP_PATHS = {"/health", "/metrics", "/favicon.ico", "/docs", "/redoc", "/openapi.json"}
 
     def __init__(self, app, logger: Optional[logging.Logger] = None):
+        """Initialise le middleware avec un logger optionnel."""
         super().__init__(app)
         self.logger = logger or logging.getLogger("ecommerce_ia")
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        """Intercepte la requête, mesure la latence et log le résultat."""
         # Générer un ID unique pour la requête
         request_id = str(uuid.uuid4())[:8]
         request.state.request_id = request_id
@@ -355,6 +358,7 @@ class PerformanceAlerts:
     }
 
     def __init__(self, thresholds: Optional[Dict] = None):
+        """Initialise les alertes avec des seuils configurables."""
         self.thresholds = thresholds or self.DEFAULT_THRESHOLDS
         self.alerts: list = []
 

@@ -1,0 +1,65 @@
+# ============================================
+# Render — Configuration de déploiement
+# ============================================
+# Ce fichier configure le déploiement sur Render.com
+# (PaaS, tier gratuit disponible)
+#
+# Services déployés :
+#   1. API Backend (FastAPI) — Web Service
+#   2. Frontend (Next.js) — Static Site
+#   3. PostgreSQL — Managed Database
+#
+# Auteur : BAWANA Théodore — Projet SAHELYS
+# ============================================
+
+services:
+  # ============================================
+  # API Backend (FastAPI + IA)
+  # ============================================
+  - type: web
+    name: ecommerce-ia-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ecommerce-ia-db
+          property: connectionString
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # ============================================
+  # Frontend (Next.js)
+  # ============================================
+  - type: web
+    name: ecommerce-ia-frontend
+    runtime: node
+    plan: free
+    buildCommand: cd frontend && npm install --legacy-peer-deps && npm run build
+    startCommand: cd frontend && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "18"
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: ecommerce-ia-api
+          type: web
+          property: host
+    autoDeploy: true
+
+# ============================================
+# Base de données PostgreSQL
+# ============================================
+databases:
+  - name: ecommerce-ia-db
+    plan: free
+    databaseName: ecommerce_ia
+    user: ecommerce

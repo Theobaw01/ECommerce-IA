@@ -10,7 +10,9 @@
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
 [![FAISS](https://img.shields.io/badge/FAISS-Meta_AI-4267B2?style=for-the-badge&logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
-[![Tests](https://img.shields.io/badge/Tests-131_passed-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](#-tests)
+[![Tests](https://img.shields.io/badge/Tests-173_passed-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](#-tests)
+[![Coverage](https://img.shields.io/badge/Coverage-70%25+-blue?style=for-the-badge&logo=codecov&logoColor=white)](#-tests)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/Theobaw01/ECommerce-IA/actions)
 [![License MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
 **CNN + Transformer | FAISS | NLP | RAG | Recommandation Hybride**
@@ -370,7 +372,7 @@ cd frontend && npm install && npm run dev
 
 ## 🧪 Tests
 
-Le projet dispose d'une suite de **149 tests unitaires** répartis en 5 modules :
+Le projet dispose d'une suite de **173 tests unitaires** répartis en 6 modules :
 
 ```bash
 # Lancer tous les tests
@@ -390,7 +392,8 @@ pytest tests/test_api.py -v
 | **test_chatbot.py** | 19 tests | Config RAG, Base de connaissances, Intégration NLP |
 | **test_api.py** | 10 tests | Modèles Pydantic, Endpoints, Pipeline |
 | **test_monitoring.py** | 18 tests | Structured logging, Métriques, Alertes, Health check |
-| **Total** | **149 passed** | ✅ |
+| **test_security.py** | 24 tests | Rate Limiting, Input Sanitization, File Validation, XSS |
+| **Total** | **173 passed** | ✅ |
 
 ---
 
@@ -399,12 +402,19 @@ pytest tests/test_api.py -v
 GitHub Actions pipeline automatisé (`.github/workflows/ci.yml`) :
 
 ```
-Push/PR → Lint (flake8) → Tests (pytest) → Build Docker → ✅
+Push/PR → Lint (flake8) → Tests + Coverage (pytest-cov) → Validate Dockerfiles → ✅
 ```
 
+| Job | Description | Durée |
+|-----|-------------|-------|
+| **Lint** | flake8 (erreurs critiques + style) | ~15s |
+| **Tests** | 149 tests + coverage (Python 3.11, 3.12) | ~2 min |
+| **Docker Lint** | Validation syntaxe Dockerfiles + docker-compose | ~10s |
+
 - **Déclenchement** : push sur `master`, pull requests
-- **Matrice** : Python 3.10, 3.11, 3.12
-- **Étapes** : Install deps → Lint → 149 tests → Build Docker image
+- **Matrice** : Python 3.11, 3.12
+- **Coverage** : rapport `pytest-cov` avec seuil minimum 70%
+- **Artefacts** : résultats XML des tests uploadés automatiquement
 
 ---
 
@@ -480,6 +490,70 @@ docker-compose ps
 | **Database** (PostgreSQL) | 5432 | — |
 | **ChromaDB** | 8080 | http://localhost:8080 |
 
+### ☁️ Déploiement Cloud
+
+Le projet est prêt pour un déploiement sur les principales plateformes cloud :
+
+| Plateforme | Fichier de config | Commande |
+|------------|-------------------|----------|
+| **Render** | `render.yaml` | Push sur GitHub → auto-deploy |
+| **Railway** | `railway.toml` | `railway up` |
+| **Heroku** | `Procfile` | `git push heroku master` |
+| **Docker** | `docker-compose.yml` | `docker-compose up -d` |
+
+```bash
+# Render (recommandé — tier gratuit)
+# 1. Connecter le repo GitHub sur render.com
+# 2. Le fichier render.yaml configure automatiquement les 3 services
+
+# Railway
+railway login
+railway up
+
+# Heroku
+heroku create ecommerce-ia
+git push heroku master
+```
+
+---
+
+## 🔒 Sécurité
+
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Rate Limiting** | Token Bucket (60 req/min par IP, burst de 15) |
+| **Security Headers** | HSTS, X-Frame-Options, XSS-Protection, CSP |
+| **Input Sanitization** | Anti-XSS, anti-injection SQL, validation fichiers |
+| **JWT Authentication** | Tokens signés HS256, expiration configurable |
+| **File Validation** | Extensions autorisées, taille max 10 Mo |
+| **Secrets Management** | Variables d'environnement, jamais en dur |
+
+---
+
+## 📸 Captures d'écran
+
+<details>
+<summary><b>🖥️ Interface utilisateur (cliquer pour voir)</b></summary>
+
+### Page d'accueil
+> *Classification visuelle par drag-and-drop d'images*
+
+### Recherche visuelle (FAISS)
+> *Upload d'une image → produits visuellement similaires*
+
+### Chatbot IA (RAG)
+> *Chat en temps réel avec le service client IA*
+
+### Recommandations personnalisées
+> *Top-10 produits recommandés par l'algorithme hybride*
+
+### API Documentation (Swagger)
+> *Documentation interactive auto-générée par FastAPI*
+> 
+> Accessible sur : http://localhost:8000/docs
+
+</details>
+
 ---
 
 ## 📁 Structure du projet
@@ -518,19 +592,26 @@ ECommerce-IA/
 │   ├── chatbot.py                # Chatbot RAG (LangChain + ChromaDB + NLP)
 │   ├── recommendation.py         # Recommandation hybride 4 facteurs
 │   ├── monitoring.py             # 📊 Monitoring & Structured Logging
+│   ├── security.py               # 🔒 Sécurité (Rate Limit, Sanitization)
+│   ├── mlflow_tracking.py        # 📈 MLflow experiment tracking
 │   ├── pipeline.py               # Pipeline unifié (6 modules)
 │   └── preprocess.py             # Prétraitement images
-├── 📁 tests/                     # 🧪 Tests unitaires (149 tests)
+├── 📁 tests/                     # 🧪 Tests unitaires (173+ tests)
 │   ├── conftest.py               # Fixtures partagées
 │   ├── test_nlp_engine.py        # Tests NLP (73 tests)
 │   ├── test_recommendation.py    # Tests Recommandation (31 tests)
 │   ├── test_chatbot.py           # Tests Chatbot (19 tests)
 │   ├── test_api.py               # Tests API (10 tests)
-│   └── test_monitoring.py        # Tests Monitoring (18 tests)
+│   ├── test_monitoring.py        # Tests Monitoring (18 tests)
+│   └── test_security.py          # Tests Sécurité (24 tests)
 ├── 📁 .github/workflows/
 │   └── ci.yml                    # GitHub Actions CI/CD
 ├── docker-compose.yml            # 5 services orchestrés
-├── Dockerfile                    # Multi-stage build
+├── Dockerfile                    # Multi-stage build (backend)
+├── Dockerfile.frontend           # Multi-stage build (frontend)
+├── render.yaml                   # ☁️ Config déploiement Render
+├── railway.toml                  # ☁️ Config déploiement Railway
+├── Procfile                      # ☁️ Config déploiement Heroku
 ├── pyproject.toml                # Config pytest + coverage
 ├── requirements.txt              # Dépendances Python
 └── README.md                     # Ce fichier

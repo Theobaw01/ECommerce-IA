@@ -60,6 +60,14 @@ from src.monitoring import (
     get_health_status,
 )
 
+# Sécurité API
+from src.security import (
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+    InputSanitizer,
+    sanitizer,
+)
+
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 log_level = "DEBUG" if DEBUG else "INFO"
 structured_logger = setup_structured_logging(level=log_level, log_file="logs/api.jsonl")
@@ -107,6 +115,14 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Middleware de sécurité (ordre : security headers → rate limit → monitoring)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=int(os.environ.get("RATE_LIMIT_RPM", "60")),
+    burst_size=int(os.environ.get("RATE_LIMIT_BURST", "15")),
 )
 
 # Middleware de monitoring (après CORS)

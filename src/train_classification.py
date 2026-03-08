@@ -235,11 +235,13 @@ class LabelSmoothingCrossEntropy(nn.Module):
     """
     
     def __init__(self, smoothing: float = 0.1):
+        """Initialise la loss avec un facteur de smoothing (défaut 0.1)."""
         super().__init__()
         self.smoothing = smoothing
         self.confidence = 1.0 - smoothing
     
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """Calcule la loss cross-entropy lissée entre prédictions et cibles."""
         log_probs = torch.nn.functional.log_softmax(pred, dim=-1)
         nll_loss = -log_probs.gather(dim=-1, index=target.unsqueeze(1)).squeeze(1)
         smooth_loss = -log_probs.mean(dim=-1)
@@ -255,6 +257,7 @@ class EarlyStopping:
     """
     
     def __init__(self, patience: int = 7, min_delta: float = 1e-4):
+        """Initialise l'early stopping avec patience et delta minimum."""
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
@@ -262,6 +265,7 @@ class EarlyStopping:
         self.should_stop = False
     
     def __call__(self, val_loss: float) -> bool:
+        """Vérifie si l'entraînement doit s'arrêter. Retourne True si oui."""
         if val_loss < self.best_loss - self.min_delta:
             self.best_loss = val_loss
             self.counter = 0
