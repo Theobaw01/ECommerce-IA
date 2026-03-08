@@ -6,7 +6,7 @@ Module de classification d'images par Vision Transformer,
 en complément du classifieur CNN (EfficientNet-B4).
 
 Démontre la maîtrise des architectures Transformers appliquées
-à la vision par ordinateur (exigence BCEAO).
+à la vision par ordinateur 
 
 Architecture :
     Image 384×384 → Patch Embedding (16×16) → Transformer Encoder (12 layers)

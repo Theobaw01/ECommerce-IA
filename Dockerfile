@@ -64,7 +64,9 @@ COPY api/ ./api/
 COPY app/ ./app/
 COPY database/ ./database/
 COPY data/ ./data/
-COPY .env.example ./.env
+
+# Les variables d'environnement sont injectées via docker-compose.yml
+RUN touch .env
 
 # Copier le frontend buildé (Next.js standalone output)
 COPY --from=frontend-builder /app/frontend/.next/standalone /app/frontend-server

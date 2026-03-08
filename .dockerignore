@@ -57,5 +57,4 @@ tests/
 
 # Misc
 README.md
-*.md
-.env.example
+CHANGELOG.md
