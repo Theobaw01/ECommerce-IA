@@ -368,9 +368,11 @@ export default function RecommendationsPage() {
                       addToCart({
                         id: Number(rec.product_id),
                         nom: rec.nom,
+                        description: "",
                         prix: rec.prix,
+                        categorie: rec.categorie,
                         image_url: "",
-                        quantite: 1,
+                        note_moyenne: 0,
                       });
                       toast.success(`${rec.nom} ajouté au panier`);
                     }}
