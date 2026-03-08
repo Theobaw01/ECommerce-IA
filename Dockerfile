@@ -30,7 +30,7 @@ FROM python:3.10-slim AS production
 
 # Métadonnées
 LABEL maintainer="BAWANA Théodore <theodore8bawana@gmail.com>"
-LABEL description="ECommerce-IA — Plateforme e-commerce avec 3 modules IA"
+LABEL description="ECommerce-IA — Plateforme e-commerce avec 6 modules IA"
 LABEL version="1.0.0"
 
 # Variables d'environnement

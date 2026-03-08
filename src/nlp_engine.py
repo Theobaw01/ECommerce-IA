@@ -68,15 +68,16 @@ INTENT_PATTERNS = {
     "recherche_produit": {
         "keywords": [
             "cherche", "recherche", "trouver", "produit", "acheter",
-            "article", "disponible", "catalogue", "achète", "veux",
-            "besoin", "chercher", "similaire", "photo", "image",
+            "article", "catalogue", "achète", "veux",
+            "chercher", "similaire", "photo", "image",
             "ressemble", "genre", "type", "modèle", "référence",
         ],
         "patterns": [
             r"je\s+(?:cherche|veux|voudrais|souhaite)\s+(?:un|une|des|le|la)",
             r"(?:avez|proposez).vous\s+(?:des|un|une)",
             r"(?:où|ou)\s+(?:trouver|acheter)",
-            r"(?:montrez|affichez|conseillez).moi",
+            r"(?:montrez|affichez).moi",
+            r"avez.vous\s+.*en\s+stock",
         ],
         "priority": 1.0,
     },
@@ -87,42 +88,49 @@ INTENT_PATTERNS = {
             "expédition", "envoi", "envoyé", "reception",
         ],
         "patterns": [
-            r"(?:suivi|suivre|état|statut)\s+(?:de\s+)?(?:ma|la|une)\s+commande",
+            r"(?:suivi|suivre|état|statut)\s+(?:de\s+)?(?:ma|la|une)\s+(?:commande|livraison)",
             r"commande\s+(?:n[°o]?\s*|numéro\s*|#\s*)?[\w\-]+",
             r"où\s+en\s+est\s+(?:ma|la)\s+commande",
             r"(?:reçu|arrivé|livré)\s+(?:ma|la|mon)",
+            r"(?:quel|quel\s+est)\s+(?:le\s+)?statut",
+            r"(?:ma|la)\s+(?:commande|livraison)\s+(?:n'?est|n'?a)",
         ],
-        "priority": 1.2,
+        "priority": 1.3,
     },
     "retour_remboursement": {
         "keywords": [
             "retour", "retourner", "rembourser", "remboursement",
             "échanger", "échange", "renvoyer", "renvoi", "annuler",
             "annulation", "défectueux", "cassé", "abîmé", "problème",
-            "endommagé", "satisfait",
+            "endommagé", "satisfait", "convient",
         ],
         "patterns": [
-            r"(?:retourner|renvoyer|échanger)\s+(?:un|une|le|la|mon|ma)",
-            r"(?:demander|obtenir|avoir)\s+(?:un\s+)?remboursement",
+            r"(?:retourner|renvoyer|échanger)\s+(?:un|une|le|la|mon|ma|cet|cette)",
+            r"(?:demander|obtenir|avoir|faire)\s+(?:un\s+)?(?:remboursement|échange|retour)",
             r"(?:produit|article)\s+(?:défectueux|cassé|abîmé|endommagé)",
+            r"(?:ne\s+)?(?:me\s+)?convient\s+pas",
             r"pas\s+satisfait",
+            r"(?:je\s+)?(?:veux|souhaite|voudrais)\s+(?:un\s+)?(?:échange|remboursement|retour)",
+            r"comment\s+(?:faire|obtenir)\s+(?:un\s+)?(?:remboursement|retour|échange)",
         ],
-        "priority": 1.1,
+        "priority": 1.2,
     },
     "livraison": {
         "keywords": [
-            "livraison", "livrer", "délai", "délais", "frais",
+            "livraison", "livrer", "livrez", "livrent", "livrons",
+            "délai", "délais", "frais",
             "gratuit", "express", "standard", "point", "relais",
             "click", "collect", "adresse", "domicile", "jour",
             "rapide", "lent", "temps",
         ],
         "patterns": [
             r"(?:délai|frais|mode|option)\s+(?:de\s+)?livraison",
-            r"(?:livré|livrer)\s+(?:en|sous|dans)",
+            r"(?:livré|livrer|livrez)\s+(?:en|sous|dans|vous|à)",
             r"livraison\s+(?:gratuite|express|standard|rapide)",
             r"(?:combien|quel)\s+(?:de\s+)?temps\s+(?:pour\s+)?(?:la\s+)?livr",
+            r"livr(?:ez|ons|ent|er).vous",
         ],
-        "priority": 1.0,
+        "priority": 1.1,
     },
     "paiement": {
         "keywords": [
@@ -141,18 +149,20 @@ INTENT_PATTERNS = {
     },
     "recommandation": {
         "keywords": [
-            "recommander", "recommandation", "suggestion", "conseil",
-            "conseiller", "suggérer", "proposer", "idée", "cadeau",
+            "recommander", "recommandez", "recommandation", "suggestion", "conseil",
+            "conseiller", "conseillez", "suggérer", "suggérez",
+            "proposer", "proposez", "idée", "cadeau",
             "populaire", "tendance", "meilleur", "top", "avis",
             "noter", "note", "personnalisé", "préférence",
         ],
         "patterns": [
-            r"(?:recommandez|conseillez|suggérez|proposez).(?:moi|nous)",
+            r"(?:recommandez|conseillez|suggérez|proposez).(?:moi|nous|vous)",
             r"(?:quel|quelle)\s+(?:est|sont)\s+(?:le|la|les)\s+meilleur",
             r"(?:idée|cadeau|suggestion)\s+(?:de|pour)",
             r"(?:que|quoi)\s+(?:me|nous)\s+(?:recommandez|conseillez)",
+            r"(?:me|nous)\s+(?:recommand|conseil|suggér|propos)",
         ],
-        "priority": 1.0,
+        "priority": 1.1,
     },
     "compte": {
         "keywords": [
@@ -170,22 +180,23 @@ INTENT_PATTERNS = {
     },
     "stock": {
         "keywords": [
-            "stock", "disponible", "disponibilité", "rupture",
+            "stock", "disponibilité", "rupture",
             "réapprovisionnement", "quantité", "restant", "épuisé",
         ],
         "patterns": [
-            r"(?:en\s+)?stock",
-            r"(?:est|sont).(?:il|elle|ils|elles)\s+disponible",
+            r"(?:est|sont).(?:il|elle|ils|elles)\s+(?:encore\s+)?(?:en\s+)?(?:stock|disponible)",
             r"rupture\s+de\s+stock",
             r"(?:combien|quantité)\s+(?:il\s+)?(?:reste|reste-t-il|en\s+stock)",
+            r"(?:quand|retour)\s+(?:en|de)\s+stock",
+            r"disponible\s+(?:en|dans)",
         ],
-        "priority": 1.1,
+        "priority": 1.0,
     },
     "promotion": {
         "keywords": [
-            "promotion", "promo", "solde", "réduction", "code",
+            "promotion", "promo", "solde", "soldes", "réduction", "code",
             "coupon", "remise", "offre", "pourcentage", "rabais",
-            "bon", "réduire", "moins", "cher",
+            "réduire", "moins", "cher",
         ],
         "patterns": [
             r"(?:code|coupon|bon)\s+(?:promo|de\s+réduction|promotionnel)",
@@ -208,7 +219,7 @@ INTENT_PATTERNS = {
     },
     "vendeur": {
         "keywords": [
-            "vendeur", "vendre", "vente", "boutique", "magasin",
+            "vendeur", "vendre", "vente", "boutique",
             "espace", "commissio", "partenaire", "marchand",
         ],
         "patterns": [
@@ -224,9 +235,9 @@ INTENT_PATTERNS = {
             "coucou", "bonne", "journée",
         ],
         "patterns": [
-            r"^(?:bonjour|bonsoir|salut|hello|hey|coucou|hi)\s*[!.?]*$",
+            r"^(?:bonjour|bonsoir|salut|hello|hey|coucou|hi)\b",
         ],
-        "priority": 0.5,
+        "priority": 0.8,
     },
     "remerciement": {
         "keywords": [
@@ -255,13 +266,13 @@ INTENT_PATTERNS = {
     "question_generale": {
         "keywords": [
             "question", "renseignement", "information", "savoir",
-            "comment", "pourquoi", "quand", "combien", "quel",
-            "expliquer", "aide", "aider",
+            "expliquer", "aide", "aider", "horaire", "magasin",
+            "contact", "adresse", "situé",
         ],
         "patterns": [
-            r"^(?:comment|pourquoi|quand|combien|quel|quelle|quels|quelles)",
             r"(?:j'ai|j ai)\s+une?\s+question",
             r"(?:pouvez|pourriez).vous\s+(?:m'|me\s+)?(?:expliquer|aider|dire)",
+            r"(?:où|quels?)\s+(?:sont|est)\s+(?:vos|votre|le|la|les)",
         ],
         "priority": 0.3,  # Faible priorité (fallback)
     },
@@ -513,9 +524,9 @@ class NLPEngine:
         for intent_name, config in self.intent_patterns.items():
             score = 0.0
             
-            # Score mots-clés
+            # Score mots-clés (word-boundary matching)
             keywords = config["keywords"]
-            hits = sum(1 for kw in keywords if kw in texte_lower)
+            hits = sum(1 for kw in keywords if re.search(r'\b' + re.escape(kw) + r'', texte_lower))
             if keywords:
                 keyword_score = (hits / len(keywords)) * config["priority"]
                 # Bonus si plusieurs hits

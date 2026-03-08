@@ -52,10 +52,10 @@ INTENT_TEST_SET: List[Dict[str, str]] = [
     {"text": "Je veux suivre mon colis", "intent": "suivi_commande"},
     {"text": "Ma commande n'est pas arrivée", "intent": "suivi_commande"},
     {"text": "Quel est le statut de ma livraison ?", "intent": "suivi_commande"},
-    # retour
-    {"text": "Je souhaite retourner cet article", "intent": "retour"},
-    {"text": "Comment faire un remboursement ?", "intent": "retour"},
-    {"text": "L'article ne me convient pas, je veux un échange", "intent": "retour"},
+    # retour_remboursement
+    {"text": "Je souhaite retourner cet article", "intent": "retour_remboursement"},
+    {"text": "Comment faire un remboursement ?", "intent": "retour_remboursement"},
+    {"text": "L'article ne me convient pas, je veux un échange", "intent": "retour_remboursement"},
     # livraison
     {"text": "Quels sont les délais de livraison ?", "intent": "livraison"},
     {"text": "Livrez-vous à Dakar ?", "intent": "livraison"},

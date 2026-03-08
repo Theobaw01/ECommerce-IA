@@ -19,6 +19,8 @@ data/kaggle_download/
 data/splits/
 models/*.pth
 models/*.pt
+models/**/*.pth
+models/**/*.pt
 models/**/*.pkl
 models/chatbot/chroma_db/
 *.h5

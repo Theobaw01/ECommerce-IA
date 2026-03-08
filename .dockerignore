@@ -42,5 +42,20 @@ logs/
 # Docker
 docker-compose.override.yml
 
+# Git
+.git/
+.github/
+
+# MLflow runs
+mlruns/
+
+# Tests
+tests/
+
 # Jupyter
 .ipynb_checkpoints/
+
+# Misc
+README.md
+*.md
+.env.example

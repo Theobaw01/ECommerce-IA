@@ -46,13 +46,24 @@ from PIL import Image
 import numpy as np
 
 # ============================================
-# Configuration
+# Configuration & Monitoring
 # ============================================
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger(__name__)
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+# Logging structuré
+from src.monitoring import (
+    setup_structured_logging,
+    RequestLoggingMiddleware,
+    metrics as perf_metrics,
+    alerts as perf_alerts,
+    get_health_status,
+)
+
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
+log_level = "DEBUG" if DEBUG else "INFO"
+structured_logger = setup_structured_logging(level=log_level, log_file="logs/api.jsonl")
+logger = logging.getLogger("ecommerce_ia")
 
 # Variables d'environnement
 # ⚠️ JWT_SECRET DOIT être défini via la variable d'environnement JWT_SECRET_KEY
@@ -97,6 +108,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware de monitoring (après CORS)
+app.add_middleware(RequestLoggingMiddleware, logger=structured_logger)
 
 # ============================================
 # Sécurité JWT
@@ -289,7 +303,7 @@ async def root():
 
 @app.get("/health", tags=["Status"])
 async def health_check():
-    """Vérification de santé de l'API."""
+    """Vérification de santé de l'API avec monitoring avancé."""
     pipeline = get_pipeline()
     modules = pipeline.status() if pipeline else {}
 
@@ -308,10 +322,32 @@ async def health_check():
     except Exception:
         modules["vit_transformer"] = {"ready": False}
 
+    # Health check avancé (composants + métriques)
+    health = get_health_status()
+
     return {
-        "status": "healthy",
+        "status": health["status"],
         "timestamp": datetime.utcnow().isoformat(),
-        "modules": modules
+        "modules": modules,
+        "components": health["components"],
+        "metrics_summary": health["metrics_summary"],
+    }
+
+
+@app.get("/metrics", tags=["Status"])
+async def get_metrics():
+    """Métriques de performance détaillées (latence, erreurs, IA)."""
+    return perf_metrics.get_summary()
+
+
+@app.get("/alerts", tags=["Status"])
+async def get_alerts():
+    """Alertes de performance actives."""
+    active_alerts = perf_alerts.check()
+    return {
+        "alert_count": len(active_alerts),
+        "alerts": active_alerts,
+        "thresholds": perf_alerts.thresholds,
     }
 
 

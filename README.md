@@ -86,7 +86,8 @@
 │  Collaborative + Content + Geo + Prix       │   Products │ Users │ Orders    │
 ├─────────────────────────────────────────────┴─────────────────────────────────┤
 │                       Tests (pytest) + CI/CD (GitHub Actions)                 │
-│              131 tests | 4 suites | NLP • Recommandation • Chatbot • API      │
+│              149 tests | 5 suites | NLP • Recommandation • Chatbot • API •    │
+│                           Monitoring • Structured Logging                      │
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -255,7 +256,8 @@ Pipeline NLP complet pour l'analyse sémantique des requêtes utilisateur.
 | **Docker** | Containerisation multi-stage |
 | **docker-compose** | Orchestration (5 services) |
 | **GitHub Actions** | CI/CD (lint, tests, build) |
-| **pytest** | 131 tests unitaires (4 suites) |
+| **pytest** | 149 tests unitaires (5 suites) |
+| **Monitoring** | Structured JSON logging + métriques temps réel |
 | **MLflow** | Tracking d'expériences IA |
 | **Google Colab** | Entraînement GPU (T4) |
 
@@ -357,11 +359,18 @@ cd frontend && npm install && npm run dev
 | `POST` | `/auth/register` | Inscription |
 | `POST` | `/auth/token` | Connexion (JWT) |
 
+### Monitoring & Métriques
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| `GET` | `/health` | Health check avancé (composants + métriques) |
+| `GET` | `/metrics` | Métriques de performance (latence, erreurs, IA) |
+| `GET` | `/alerts` | Alertes de performance actives |
+
 ---
 
 ## 🧪 Tests
 
-Le projet dispose d'une suite de **131 tests unitaires** répartis en 4 modules :
+Le projet dispose d'une suite de **149 tests unitaires** répartis en 5 modules :
 
 ```bash
 # Lancer tous les tests
@@ -380,7 +389,8 @@ pytest tests/test_api.py -v
 | **test_recommendation.py** | 31 tests | SVD, Content-Based, Haversine, Prix, Poids, Métriques (P@K, R@K, NDCG, Coverage) |
 | **test_chatbot.py** | 19 tests | Config RAG, Base de connaissances, Intégration NLP |
 | **test_api.py** | 10 tests | Modèles Pydantic, Endpoints, Pipeline |
-| **Total** | **131 passed** | ✅ |
+| **test_monitoring.py** | 18 tests | Structured logging, Métriques, Alertes, Health check |
+| **Total** | **149 passed** | ✅ |
 
 ---
 
@@ -394,7 +404,7 @@ Push/PR → Lint (flake8) → Tests (pytest) → Build Docker → ✅
 
 - **Déclenchement** : push sur `master`, pull requests
 - **Matrice** : Python 3.10, 3.11, 3.12
-- **Étapes** : Install deps → Lint → 131 tests → Build Docker image
+- **Étapes** : Install deps → Lint → 149 tests → Build Docker image
 
 ---
 
@@ -444,9 +454,13 @@ Les credentials Kaggle sont chargées depuis les **Secrets Google Colab** (icôn
 
 | Métrique | Valeur |
 |----------|--------|
-| **Intents** | 15 classes (keyword + regex + softmax) |
-| **Entités NER** | 10 types (ORDER_ID, PRODUCT, CATEGORY, PRICE, COLOR, SIZE, CITY, EMAIL, PHONE, DATE) |
-| **Sentiment** | 3 classes (positif/neutre/négatif), score [-1, +1] |
+| **Intent Accuracy** | **100%** (35 samples gold standard) |
+| **Intent F1 macro** | **1.0000** |
+| **Intents** | 15 classes (word-boundary keyword + regex + softmax) |
+| **Entités NER** | 10 types — F1 : **0.96** |
+| **Sentiment** | 3 classes — Accuracy : **87.5%** |
+| **Latence** | **1.36 ms** moyenne par analyse |
+| **Techniques** | Word-boundary matching, conjugated verb forms, priority scoring |
 | **Tests** | 73/73 passed (dont 14 parametrized intent tests) |
 
 ---
@@ -503,14 +517,16 @@ ECommerce-IA/
 │   ├── nlp_engine.py             # 🧠 Moteur NLP (Intent + NER + Sentiment)
 │   ├── chatbot.py                # Chatbot RAG (LangChain + ChromaDB + NLP)
 │   ├── recommendation.py         # Recommandation hybride 4 facteurs
+│   ├── monitoring.py             # 📊 Monitoring & Structured Logging
 │   ├── pipeline.py               # Pipeline unifié (6 modules)
 │   └── preprocess.py             # Prétraitement images
-├── 📁 tests/                     # 🧪 Tests unitaires (131 tests)
+├── 📁 tests/                     # 🧪 Tests unitaires (149 tests)
 │   ├── conftest.py               # Fixtures partagées
 │   ├── test_nlp_engine.py        # Tests NLP (73 tests)
 │   ├── test_recommendation.py    # Tests Recommandation (31 tests)
 │   ├── test_chatbot.py           # Tests Chatbot (19 tests)
-│   └── test_api.py               # Tests API (10 tests)
+│   ├── test_api.py               # Tests API (10 tests)
+│   └── test_monitoring.py        # Tests Monitoring (18 tests)
 ├── 📁 .github/workflows/
 │   └── ci.yml                    # GitHub Actions CI/CD
 ├── docker-compose.yml            # 5 services orchestrés
