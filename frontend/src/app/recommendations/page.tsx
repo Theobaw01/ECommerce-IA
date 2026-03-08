@@ -366,7 +366,7 @@ export default function RecommendationsPage() {
                   <button
                     onClick={() => {
                       addToCart({
-                        id: rec.product_id,
+                        id: Number(rec.product_id),
                         nom: rec.nom,
                         prix: rec.prix,
                         image_url: "",

@@ -44,7 +44,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dépendances système
+# Dépendances système (gcc/g++ requis pour scikit-surprise Cython build)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0t64 \
@@ -54,6 +54,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     curl \
     nginx \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer les dépendances Python
