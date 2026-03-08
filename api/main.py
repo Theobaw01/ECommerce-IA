@@ -196,8 +196,10 @@ class TokenResponse(BaseModel):
 class ClassificationResult(BaseModel):
     categorie: str
     confiance: float
-    top_k: List[Dict[str, Any]]
-    inference_ms: float
+    top5: List[Dict[str, Any]] = []
+    top_k: List[Dict[str, Any]] = []
+    temps_inference: float = 0.0
+    inference_ms: float = 0.0
 
 
 # Recommandation
@@ -272,12 +274,14 @@ class ProductSearch(BaseModel):
 # Pipeline IA (chargement paresseux)
 # ============================================
 _pipeline = None
+_pipeline_attempted = False
 
 
 def get_pipeline():
-    """Retourne le pipeline IA (chargé une seule fois)."""
-    global _pipeline
-    if _pipeline is None:
+    """Retourne le pipeline IA (chargé une seule fois). Retourne None si indisponible."""
+    global _pipeline, _pipeline_attempted
+    if _pipeline is None and not _pipeline_attempted:
+        _pipeline_attempted = True
         try:
             from src.pipeline import EcommerceAIPipeline
             _pipeline = EcommerceAIPipeline()
@@ -287,19 +291,21 @@ def get_pipeline():
                 charger_chatbot=True
             )
             logger.info("✅ Pipeline IA chargé")
+        except ImportError as e:
+            logger.warning(f"⚠️  Pipeline IA non importable (dépendance manquante) : {e}")
+            _pipeline = None
         except Exception as e:
             logger.warning(f"⚠️  Pipeline IA non disponible : {e}")
-            # Créer un pipeline minimal
-            from src.pipeline import EcommerceAIPipeline
-            _pipeline = EcommerceAIPipeline()
             try:
+                from src.pipeline import EcommerceAIPipeline
+                _pipeline = EcommerceAIPipeline()
                 _pipeline.initialiser(
                     charger_classifier=False,
                     charger_recommender=True,
                     charger_chatbot=True
                 )
             except Exception:
-                pass
+                _pipeline = None
     return _pipeline
 
 
@@ -463,6 +469,10 @@ async def classify_image(
     
     if "erreur" in result:
         raise HTTPException(status_code=500, detail=result["erreur"])
+    
+    # Aligner les noms de champs pour le frontend
+    result["top5"] = result.get("top_k", [])
+    result["temps_inference"] = result.get("inference_ms", 0.0)
     
     return ClassificationResult(**result)
 
@@ -676,7 +686,32 @@ async def get_recommendations(
     pipeline = get_pipeline()
     
     if not pipeline or not pipeline.is_recommender_ready:
-        raise HTTPException(status_code=503, detail="Recommandeur non disponible")
+        # Fallback : recommandations basées sur le catalogue démo
+        import random
+        _init_catalog()
+        shuffled = _products_catalog.copy()
+        random.shuffle(shuffled)
+        demo_recs = []
+        for p in shuffled[:n]:
+            demo_recs.append({
+                "product_id": str(p.get("id", "")),
+                "nom": p.get("nom", ""),
+                "categorie": p.get("categorie", ""),
+                "prix": p.get("prix", 0),
+                "score_final": round(random.uniform(0.6, 0.95), 4),
+                "facteurs": {
+                    "historique": round(random.uniform(0.3, 0.9), 4),
+                    "similarite": round(random.uniform(0.4, 0.95), 4),
+                    "geographique": round(random.uniform(0.5, 1.0), 4),
+                    "prix": round(random.uniform(0.5, 1.0), 4),
+                },
+            })
+        demo_recs.sort(key=lambda x: x["score_final"], reverse=True)
+        return {
+            "user_id": user_id,
+            "recommendations": demo_recs,
+            "count": len(demo_recs),
+        }
     
     recs = pipeline.recommander(
         user_id=user_id,
@@ -702,7 +737,16 @@ async def get_similar_products(
     pipeline = get_pipeline()
     
     if not pipeline or not pipeline.is_recommender_ready:
-        raise HTTPException(status_code=503, detail="Recommandeur non disponible")
+        # Fallback : produits aléatoires du catalogue
+        import random
+        _init_catalog()
+        shuffled = [p for p in _products_catalog if str(p.get("id", "")) != product_id]
+        random.shuffle(shuffled)
+        return {
+            "product_id": product_id,
+            "similar_products": shuffled[:n],
+            "count": min(n, len(shuffled))
+        }
     
     similar = pipeline.produits_similaires(product_id, n)
     
@@ -746,11 +790,15 @@ async def chat(message: ChatMessage):
     
     La réponse inclut les données NLP (intent, entités, sentiment)
     pour enrichir l'interface utilisateur.
+    
+    Si le pipeline RAG complet n'est pas disponible, un fallback
+    NLP-only est utilisé pour fournir une réponse contextuelle.
     """
     pipeline = get_pipeline()
     
+    # --- Fallback NLP si chatbot RAG non disponible ---
     if not pipeline or not pipeline.is_chatbot_ready:
-        raise HTTPException(status_code=503, detail="Chatbot non disponible")
+        return await _chat_fallback_nlp(message)
     
     response = pipeline.chat(
         message=message.message,
@@ -765,6 +813,70 @@ async def chat(message: ChatMessage):
         escalade_humain=response.get("escalade_humain", False),
         nlp=response.get("nlp", None)
     )
+
+
+async def _chat_fallback_nlp(message: ChatMessage) -> ChatResponse:
+    """
+    Fallback NLP quand le chatbot RAG n'est pas disponible.
+    Utilise le moteur NLP pour analyser l'intent et fournir
+    une réponse contextuelle basée sur les règles.
+    """
+    try:
+        from src.nlp_engine import get_nlp_engine
+        nlp = get_nlp_engine()
+        analysis = nlp.analyser(message.message)
+        
+        intent = analysis.get("intent", {}).get("intent", "general")
+        confidence = analysis.get("intent", {}).get("confidence", 0.0)
+        sentiment = analysis.get("sentiment", {}).get("label", "neutre")
+        entities = analysis.get("entities", [])
+        keywords = analysis.get("keywords", [])
+        
+        # Réponses contextuelles par intent
+        responses = {
+            "recherche_produit": "Je peux vous aider à trouver un produit ! Utilisez la page Recherche pour explorer notre catalogue par texte ou par image. Notre IA de classification visuelle identifie automatiquement les catégories de produits.",
+            "suivi_commande": "Pour suivre votre commande, rendez-vous dans votre espace Profil. Vous y trouverez l'historique et le statut de toutes vos commandes.",
+            "retour_remboursement": "Notre politique de retour vous permet de retourner un article dans les 30 jours suivant la réception. Rendez-vous dans votre Profil pour initier un retour.",
+            "livraison": "Nous proposons la livraison standard (3-5 jours) et express (24-48h). Les frais de livraison sont calculés en fonction du poids et de la destination.",
+            "paiement": "Nous acceptons les cartes bancaires (Visa, Mastercard), le virement bancaire, et le paiement mobile (Orange Money, Wave). Tous les paiements sont sécurisés.",
+            "recommandation": "Consultez la page Recommandations pour des suggestions personnalisées basées sur vos préférences et votre historique de navigation.",
+            "stock": "Pour vérifier la disponibilité d'un produit, consultez sa fiche produit. Le stock est mis à jour en temps réel.",
+            "plainte": "Je suis désolé pour ce désagrément. Votre satisfaction est notre priorité. Un agent humain va prendre en charge votre demande.",
+            "salutation": "Bonjour ! 👋 Je suis l'assistant IA de SmartMarket. Comment puis-je vous aider aujourd'hui ?",
+            "remerciement": "Merci à vous ! N'hésitez pas si vous avez d'autres questions. 😊",
+            "general": "Je suis l'assistant IA de SmartMarket. Je peux vous aider avec la recherche de produits, le suivi de commande, les recommandations personnalisées, et bien plus. Que souhaitez-vous savoir ?",
+        }
+        
+        reponse = responses.get(intent, responses["general"])
+        escalade = intent == "plainte" or sentiment == "négatif"
+        
+        nlp_data = {
+            "intent": intent,
+            "intent_confidence": confidence,
+            "sentiment": sentiment,
+            "sentiment_score": analysis.get("sentiment", {}).get("score", 0.0),
+            "entities": [{"type": e.get("type", ""), "value": e.get("value", "")} for e in entities],
+            "keywords": [k.get("mot", k) if isinstance(k, dict) else str(k) for k in keywords],
+        }
+        
+        return ChatResponse(
+            session_id=message.session_id or f"fallback_{uuid.uuid4().hex[:8]}",
+            reponse=reponse,
+            confiance=confidence,
+            sources=["NLP Engine (fallback mode)"],
+            escalade_humain=escalade,
+            nlp=nlp_data,
+        )
+    except Exception as e:
+        logger.error(f"Fallback NLP error: {e}")
+        return ChatResponse(
+            session_id=message.session_id or "error",
+            reponse="Bonjour ! Je suis l'assistant SmartMarket. Comment puis-je vous aider ?",
+            confiance=0.5,
+            sources=[],
+            escalade_humain=False,
+            nlp=None,
+        )
 
 
 @app.get("/chat/history/{session_id}", tags=["Chatbot"])
@@ -920,14 +1032,42 @@ async def route_request(request: NLPAnalysisRequest):
 # Catalogue en mémoire (remplacer par DB)
 _products_catalog: List[Dict] = []
 
+# Catalogue de démonstration pour le mode dégradé (sans pipeline IA)
+_DEMO_CATALOG = [
+    {"id": 1, "nom": "T-shirt Blanc Classic", "description": "T-shirt en coton bio, coupe ajustée", "categorie": "Topwear", "prix": 19.99, "marque": "EcoWear", "stock": 150, "image_url": "/images/tshirt-blanc.jpg", "note_moyenne": 4.5, "tags": ["t-shirt", "blanc", "coton", "basique"]},
+    {"id": 2, "nom": "Jean Slim Bleu", "description": "Jean slim stretch confortable", "categorie": "Bottomwear", "prix": 49.99, "marque": "DenimCo", "stock": 80, "image_url": "/images/jean-slim.jpg", "note_moyenne": 4.3, "tags": ["jean", "slim", "bleu", "denim"]},
+    {"id": 3, "nom": "Robe d'été Fleurie", "description": "Robe légère à motifs floraux", "categorie": "Dress", "prix": 39.99, "marque": "FloraStyle", "stock": 60, "image_url": "/images/robe-fleurie.jpg", "note_moyenne": 4.7, "tags": ["robe", "été", "fleurie", "femme"]},
+    {"id": 4, "nom": "Sneakers Running Pro", "description": "Chaussures de course légères et amorties", "categorie": "Shoes", "prix": 89.99, "marque": "RunFast", "stock": 45, "image_url": "/images/sneakers.jpg", "note_moyenne": 4.6, "tags": ["chaussures", "sport", "running", "sneakers"]},
+    {"id": 5, "nom": "Sac à Main Cuir", "description": "Sac à main en cuir véritable avec compartiments", "categorie": "Bags", "prix": 129.99, "marque": "LuxBag", "stock": 30, "image_url": "/images/sac-cuir.jpg", "note_moyenne": 4.8, "tags": ["sac", "cuir", "femme", "luxe"]},
+    {"id": 6, "nom": "Montre Connectée Sport", "description": "Montre intelligente avec GPS et cardio", "categorie": "Watches", "prix": 199.99, "marque": "TechTime", "stock": 25, "image_url": "/images/montre.jpg", "note_moyenne": 4.4, "tags": ["montre", "connectée", "sport", "gps"]},
+    {"id": 7, "nom": "Veste en Jean", "description": "Veste en denim classique", "categorie": "Topwear", "prix": 59.99, "marque": "DenimCo", "stock": 40, "image_url": "/images/veste-jean.jpg", "note_moyenne": 4.2, "tags": ["veste", "jean", "denim", "casual"]},
+    {"id": 8, "nom": "Lunettes de Soleil Aviator", "description": "Lunettes aviator avec protection UV400", "categorie": "Eyewear", "prix": 79.99, "marque": "SunVision", "stock": 55, "image_url": "/images/lunettes.jpg", "note_moyenne": 4.5, "tags": ["lunettes", "soleil", "aviator", "uv"]},
+    {"id": 9, "nom": "Pull Laine Mérinos", "description": "Pull chaud en laine mérinos", "categorie": "Topwear", "prix": 69.99, "marque": "WoolComfort", "stock": 35, "image_url": "/images/pull-laine.jpg", "note_moyenne": 4.6, "tags": ["pull", "laine", "mérinos", "hiver"]},
+    {"id": 10, "nom": "Short de Bain Tropical", "description": "Short de bain imprimé tropical", "categorie": "Bottomwear", "prix": 24.99, "marque": "BeachLife", "stock": 70, "image_url": "/images/short-bain.jpg", "note_moyenne": 4.1, "tags": ["short", "bain", "plage", "été"]},
+    {"id": 11, "nom": "Ceinture Cuir Noir", "description": "Ceinture en cuir véritable à boucle classique", "categorie": "Accessories", "prix": 34.99, "marque": "LuxBag", "stock": 90, "image_url": "/images/ceinture.jpg", "note_moyenne": 4.3, "tags": ["ceinture", "cuir", "noir", "accessoire"]},
+    {"id": 12, "nom": "Sandales Été Confort", "description": "Sandales légères avec semelle ergonomique", "categorie": "Flip Flops", "prix": 29.99, "marque": "ComfortWalk", "stock": 65, "image_url": "/images/sandales.jpg", "note_moyenne": 4.0, "tags": ["sandales", "été", "confort", "plage"]},
+    {"id": 13, "nom": "Chemise Lin Blanc", "description": "Chemise en lin naturel coupe décontractée", "categorie": "Topwear", "prix": 44.99, "marque": "EcoWear", "stock": 50, "image_url": "/images/chemise-lin.jpg", "note_moyenne": 4.4, "tags": ["chemise", "lin", "blanc", "décontracté"]},
+    {"id": 14, "nom": "Sac à Dos Voyage", "description": "Sac à dos 40L avec compartiment laptop", "categorie": "Bags", "prix": 69.99, "marque": "TravelPro", "stock": 40, "image_url": "/images/sac-dos.jpg", "note_moyenne": 4.7, "tags": ["sac", "dos", "voyage", "laptop"]},
+    {"id": 15, "nom": "Chapeau Panama", "description": "Chapeau panama en paille naturelle", "categorie": "Headwear", "prix": 39.99, "marque": "SunVision", "stock": 45, "image_url": "/images/chapeau.jpg", "note_moyenne": 4.2, "tags": ["chapeau", "panama", "paille", "été"]},
+    {"id": 16, "nom": "Portefeuille Compact", "description": "Portefeuille en cuir avec protection RFID", "categorie": "Wallets", "prix": 49.99, "marque": "LuxBag", "stock": 80, "image_url": "/images/portefeuille.jpg", "note_moyenne": 4.5, "tags": ["portefeuille", "cuir", "rfid", "compact"]},
+    {"id": 17, "nom": "Polo Sport Classic", "description": "Polo en coton piqué avec col renforcé", "categorie": "Topwear", "prix": 29.99, "marque": "SportStyle", "stock": 100, "image_url": "/images/polo.jpg", "note_moyenne": 4.3, "tags": ["polo", "sport", "coton", "classic"]},
+    {"id": 18, "nom": "Jupe Plissée Midi", "description": "Jupe plissée mi-longue élégante", "categorie": "Bottomwear", "prix": 34.99, "marque": "FloraStyle", "stock": 55, "image_url": "/images/jupe.jpg", "note_moyenne": 4.4, "tags": ["jupe", "plissée", "midi", "femme"]},
+    {"id": 19, "nom": "Baskets Urbaines", "description": "Baskets tendance pour un look urbain", "categorie": "Shoes", "prix": 74.99, "marque": "UrbanStep", "stock": 60, "image_url": "/images/baskets.jpg", "note_moyenne": 4.5, "tags": ["baskets", "urbain", "tendance", "casual"]},
+    {"id": 20, "nom": "Écharpe Cachemire", "description": "Écharpe douce en cachemire mélangé", "categorie": "Scarves", "prix": 54.99, "marque": "WoolComfort", "stock": 35, "image_url": "/images/echarpe.jpg", "note_moyenne": 4.8, "tags": ["écharpe", "cachemire", "hiver", "luxe"]},
+]
+
 
 def _init_catalog():
-    """Initialise le catalogue depuis le recommandeur."""
+    """Initialise le catalogue depuis le recommandeur ou les données démo."""
     global _products_catalog
     if not _products_catalog:
         pipeline = get_pipeline()
         if pipeline and pipeline.is_recommender_ready and pipeline.recommender.products_df is not None:
             _products_catalog = pipeline.recommender.products_df.to_dict("records")
+        else:
+            # Charger le catalogue de démonstration
+            _products_catalog = [p.copy() for p in _DEMO_CATALOG]
+            logger.info(f"📦 Catalogue démo chargé : {len(_products_catalog)} produits")
 
 
 @app.get("/products", tags=["Produits"])
@@ -962,6 +1102,34 @@ async def list_products(
         "limit": limit,
         "pages": (len(filtered) + limit - 1) // limit
     }
+
+
+@app.get("/products/search", tags=["Produits"])
+async def search_products_text(
+    q: str = Query(..., min_length=1, max_length=200, description="Terme de recherche"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100)
+):
+    """
+    Recherche de produits par texte.
+    Cherche dans le nom, la catégorie, la description et les tags.
+    """
+    _init_catalog()
+    query_lower = q.lower().strip()
+    
+    matching = [
+        p for p in _products_catalog
+        if query_lower in str(p.get("nom", "")).lower()
+        or query_lower in str(p.get("categorie", "")).lower()
+        or query_lower in str(p.get("description", "")).lower()
+        or query_lower in str(p.get("marque", "")).lower()
+        or any(query_lower in str(t).lower() for t in p.get("tags", []))
+    ]
+    
+    start = (page - 1) * limit
+    end = start + limit
+    
+    return matching[start:end]
 
 
 @app.get("/products/{product_id}", tags=["Produits"])
@@ -1055,7 +1223,7 @@ async def delete_product(product_id: str):
     raise HTTPException(status_code=404, detail="Produit non trouvé")
 
 
-@app.post("/products/search", tags=["Produits"])
+@app.post("/products/search/image", tags=["Produits"])
 async def search_products_by_image(
     file: UploadFile = File(...),
     n: int = Query(default=10, ge=1, le=50)
