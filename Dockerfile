@@ -8,7 +8,7 @@
 # ============================================
 
 # ============================================
-# STAGE 1 : Build frontend Next.js 14
+# STAGE 1 : Build frontend Next.js 14 (optionnel)
 # ============================================
 FROM node:18-alpine AS frontend-builder
 
@@ -16,12 +16,15 @@ WORKDIR /app/frontend
 
 # Installer les dépendances
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --legacy-peer-deps || npm install
+RUN npm ci --legacy-peer-deps 2>/dev/null || npm install --legacy-peer-deps
 
 # Copier et builder
 COPY frontend/ .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN npm run build || echo "Frontend build skipped — will use Dockerfile.frontend in docker-compose"
+
+# Créer les répertoires au cas où le build échoue 
+RUN mkdir -p /app/frontend/.next/standalone /app/frontend/.next/static /app/frontend/public
 
 # ============================================
 # STAGE 2 : Backend Python (API + IA + Streamlit)

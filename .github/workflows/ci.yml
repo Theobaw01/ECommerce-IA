@@ -75,10 +75,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker image
+      - name: Build Docker image (API backend)
         run: |
-          docker build -t ecommerce-ia:${{ github.sha }} .
+          docker build --target production -t ecommerce-ia:${{ github.sha }} .
           docker tag ecommerce-ia:${{ github.sha }} ecommerce-ia:latest
 
-      - name: Verify Docker image
-        run: docker images ecommerce-ia
+      - name: Build Docker image (Frontend)
+        run: |
+          docker build -f Dockerfile.frontend -t ecommerce-ia-frontend:${{ github.sha }} .
+          docker tag ecommerce-ia-frontend:${{ github.sha }} ecommerce-ia-frontend:latest
+
+      - name: Verify Docker images
+        run: docker images | grep ecommerce-ia
